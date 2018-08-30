@@ -18,7 +18,7 @@
     Allow from all
   </Directory>
 
-  <Directory "/opt/dep/htdocs">
+  <Directory "/opt/depbackend/htdocs">
     Options Indexes MultiViews FollowSymLinks
     AllowOverride All
 
@@ -27,19 +27,19 @@
     Options +ExecCGI
   </Directory>
 
-  <Directory "/opt/dep/htdocs/auto">
+  <Directory "/opt/depbackend/htdocs/auto">
 
     RewriteRule ^([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]+)_(.*).png$ map.wsgi?year=$1&month=$2&day=$3&year2=$4&month2=$5&day2=$6&scenario=$7&v=$8
     RewriteRule ^huc([0-9]{8,12})_([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]+)_(.*).png$ map.wsgi?year=$2&month=$3&day=$4&year2=$5&month2=$6&day2=$7&scenario=$8&v=$9&huc=$1
     RewriteRule ^([0-9]{8,12})_report.pdf$ huc12report.py?huc=$1
   </Directory>
 
-  <Directory "/opt/dep/htdocs/geojson">
+  <Directory "/opt/depbackend/htdocs/geojson">
     SetOutputFilter DEFLATE
   </Directory>
 
-  Alias "/admin" "/opt/dep/admin"
-  <Directory "/opt/dep/admin">
+  Alias "/admin" "/opt/depbackend/admin"
+  <Directory "/opt/depbackend/admin">
         AuthUserFile /opt/iem/config/admin.users
         AuthGroupFile /dev/null
         AuthName Administrative
@@ -52,7 +52,7 @@
     AllowOverride All
   </Directory>
 
-  <Directory "/opt/dep/admin/plots">
+  <Directory "/opt/depbackend/admin/plots">
     RewriteRule "^slopes([0-9]+)_([0-9]{12})_([0-9A-Z]+).png$" "slopes.py?scenario=$1&huc_12=$2&model_twp=$3"
   </Directory>
 
