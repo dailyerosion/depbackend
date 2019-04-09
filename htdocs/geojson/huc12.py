@@ -22,17 +22,19 @@ def do(ts, ts2, domain):
     domainextra = ''
     if domain is not None:
         domainextra = " and states ~* '%s'" % (domain[:2].upper(),)
-    cursor.execute("""WITH data as (
-        SELECT ST_asGeoJson(ST_Transform(simple_geom, 4326), 4) as g,
-        huc_12
-        from huc12 WHERE scenario = 0 """ + domainextra + """), obs as (
-        SELECT huc_12,
+    cursor.execute("""
+        WITH data as (
+            SELECT ST_asGeoJson(ST_Transform(simple_geom, 4326), 4) as g,
+            huc_12
+            from huc12 WHERE scenario = 0 """ + domainextra + """),
+        obs as (
+            SELECT huc_12,
             sum(coalesce(avg_loss, 0)) * 4.463 as avg_loss,
             sum(coalesce(avg_delivery, 0)) * 4.463 as avg_delivery,
             sum(coalesce(qc_precip, 0)) / 25.4 as qc_precip,
             sum(coalesce(avg_runoff, 0)) / 25.4 as avg_runoff
-        from results_by_huc12 WHERE
-        """+dextra+""" and scenario = 0 GROUP by huc_12)
+            from results_by_huc12 WHERE
+            """+dextra+""" and scenario = 0 GROUP by huc_12)
 
         SELECT d.g, d.huc_12,
         coalesce(o.avg_loss, 0),
