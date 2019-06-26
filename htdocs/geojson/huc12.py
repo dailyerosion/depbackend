@@ -78,6 +78,12 @@ def do(ts, ts2, domain):
                         qc_precip=myramp,
                         avg_delivery=myramp,
                         avg_runoff=myramp)
+    res['max_values'] = dict(
+        avg_loss=max(avg_loss),
+        qc_precip=max(qc_precip),
+        avg_delivery=max(avg_delivery),
+        avg_runoff=max(avg_runoff)
+    )
     return json.dumps(res)
 
 
