@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 """GeoJSON service for HUC12 data"""
-import json
 import cgi
 import datetime
 
 import memcache
+
+# needed for Decimal formatting to work
+import simplejson as json
 from pyiem.dep import RAMPS
 from pyiem.util import get_dbconn, ssw
 
@@ -37,10 +39,10 @@ def do(ts, ts2, domain):
             """+dextra+""" and scenario = 0 GROUP by huc_12)
 
         SELECT d.g, d.huc_12,
-        coalesce(o.avg_loss, 0),
-        coalesce(o.qc_precip, 0),
-        coalesce(o.avg_delivery, 0),
-        coalesce(o.avg_runoff, 0)
+        coalesce(round(o.avg_loss::numeric, 2), 0),
+        coalesce(round(o.qc_precip::numeric, 2), 0),
+        coalesce(round(o.avg_delivery::numeric, 2), 0),
+        coalesce(round(o.avg_runoff::numeric, 2), 0)
         from data d LEFT JOIN obs o ON (d.huc_12 = o.huc_12)
     """, args)
     res = {'type': 'FeatureCollection',
