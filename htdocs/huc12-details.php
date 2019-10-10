@@ -6,7 +6,7 @@ $date2 = isset($_REQUEST['date2'])? strtotime($_REQUEST['date2']): null;
 $scenario = isset($_REQUEST["scenario"]) ? intval($_REQUEST["scenario"]): 0;
 $year = date("Y", $date);
 
-$dbconn = pg_connect("dbname=idep host=iemdb user=nobody");
+$dbconn = pg_connect("dbname=idep host=iemdb-idep.local user=nobody");
 function timeit($db, $name, $sql){
 	$start = time();
 	$rs = pg_execute($db, $name, $sql);
