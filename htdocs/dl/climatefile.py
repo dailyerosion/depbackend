@@ -30,8 +30,8 @@ def main():
     """Go Main Go."""
     form = cgi.FieldStorage()
     try:
-        lat = float(form.getfirst('lat'))
-        lon = float(form.getfirst('lon'))
+        lat = float(form.getfirst("lat"))
+        lon = float(form.getfirst("lon"))
     except (ValueError, TypeError):
         ssw("Content-type: text/plain\n\n")
         ssw("API FAIL!")
@@ -43,10 +43,9 @@ def main():
         return
 
     ssw("Content-type: application/octet-stream\n")
-    ssw("Content-Disposition: attachment; filename=%s\n\n" % (
-        fn.split("/")[-1],))
+    ssw("Content-Disposition: attachment; filename=%s\n\n" % (fn.split("/")[-1],))
     ssw(open(fn).read())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
