@@ -1,14 +1,13 @@
-#!/usr/bin/env python
 """GeoJSON service for HUC12 data"""
-import cgi
 import datetime
 
 import memcache
 
 # needed for Decimal formatting to work
 import simplejson as json
+from paste.request import parse_formvars
 from pyiem.dep import RAMPS
-from pyiem.util import get_dbconn, ssw
+from pyiem.util import get_dbconn
 
 
 def do(ts, ts2, domain):
@@ -104,20 +103,19 @@ def do(ts, ts2, domain):
     return json.dumps(res)
 
 
-def main():
+def application(environ, start_response):
     """Do Fun things"""
-    ssw("Content-Type: application/vnd.geo+json\n\n")
-    form = cgi.FieldStorage()
-    cb = form.getfirst("callback", None)
-    domain = form.getfirst("domain", None)
-    ts = datetime.datetime.strptime(
-        form.getfirst("date", "2015-05-05"), "%Y-%m-%d"
-    )
+    headers = [("Content-Type", "application/vnd.geo+json")]
+    start_response("200 OK", headers)
+    form = parse_formvars(environ)
+    cb = form.get("callback", None)
+    domain = form.get("domain", None)
+    ts = datetime.datetime.strptime(form.get("date", "2015-05-05"), "%Y-%m-%d")
     ts2 = None
-    if form.getfirst("date2", None) is not None:
-        ts2 = datetime.datetime.strptime(form.getfirst("date2"), "%Y-%m-%d")
+    if form.get("date2", None) is not None:
+        ts2 = datetime.datetime.strptime(form.get("date2"), "%Y-%m-%d")
 
-    mckey = ("/geojson/huc12/%s/%s/%s") % (
+    mckey = "/geojson/huc12/%s/%s/%s" % (
         ts.strftime("%Y%m%d"),
         "" if ts2 is None else ts2.strftime("%Y%m%d"),
         "" if domain is None else domain,
@@ -128,11 +126,6 @@ def main():
         res = do(ts, ts2, domain)
         mc.set(mckey, res, 3600)
 
-    if cb is None:
-        ssw(res)
-    else:
-        ssw("%s(%s)" % (cb, res))
-
-
-if __name__ == "__main__":
-    main()
+    if cb is not None:
+        res = "%s(%s)" % (cb, res)
+    return [res.encode("ascii")]

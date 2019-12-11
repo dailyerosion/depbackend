@@ -22,8 +22,8 @@
     Options Indexes MultiViews FollowSymLinks
     AllowOverride All
 
-    AddHandler wsgi-script .wsgi
-    AddHandler cgi-script .py
+    WSGIProcessGroup iemwsgi_ap
+    AddHandler wsgi-script .py
     Options +ExecCGI
   </Directory>
 

@@ -1,10 +1,8 @@
-#!/usr/bin/env python
 """Service providing a WEPP climate file."""
 import os
-import cgi
 
+from paste.request import parse_formvars
 from pyiem.dep import get_cli_fname
-from pyiem.util import ssw
 
 
 def spiral(lon, lat):
@@ -26,29 +24,28 @@ def spiral(lon, lat):
     return None
 
 
-def main():
+def application(environ, start_response):
     """Go Main Go."""
-    form = cgi.FieldStorage()
+    form = parse_formvars(environ)
     try:
-        lat = float(form.getfirst("lat"))
-        lon = float(form.getfirst("lon"))
+        lat = float(form.get("lat"))
+        lon = float(form.get("lon"))
     except (ValueError, TypeError):
-        ssw("Content-type: text/plain\n\n")
-        ssw("API FAIL!")
-        return
+        headers = [("Content-type", "text/plain")]
+        start_response("500 Internal Server Error", headers)
+        return [b"API FAIL!"]
     fn = spiral(lon, lat)
     if fn is None:
-        ssw("Content-type: text/plain\n\n")
-        ssw("API FAIL!")
-        return
+        headers = [("Content-type", "text/plain")]
+        start_response("500 Internal Server Error", headers)
+        return [b"API FAIL!"]
 
-    ssw("Content-type: application/octet-stream\n")
-    ssw(
-        "Content-Disposition: attachment; filename=%s\n\n"
-        % (fn.split("/")[-1],)
-    )
-    ssw(open(fn).read())
-
-
-if __name__ == "__main__":
-    main()
+    headers = [
+        ("Content-type", "application/octet-stream"),
+        (
+            "Content-Disposition",
+            "attachment; filename=%s" % (fn.split("/")[-1],),
+        ),
+    ]
+    start_response("200 OK", headers)
+    return [open(fn, "rb").read()]

@@ -1,10 +1,9 @@
-#!/usr/bin/env python
 """Return the time domain that we have DEP data for, given this scenario"""
-import cgi
 import json
 import datetime
 
-from pyiem.util import get_dbconn, ssw
+from paste.request import parse_formvars
+from pyiem.util import get_dbconn
 
 ISO = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -34,14 +33,11 @@ def get_time(scenario):
     return d
 
 
-def main():
+def application(environ, start_response):
     """DO Something"""
-    form = cgi.FieldStorage()
-    scenario = int(form.getfirst("scenario", 0))
-    ssw("Content-type: application/json\n\n")
+    form = parse_formvars(environ)
+    scenario = int(form.get("scenario", 0))
+    headers = [("Content-type", "application/json")]
+    start_response("200 OK", headers)
 
-    ssw(json.dumps(get_time(scenario)))
-
-
-if __name__ == "__main__":
-    main()
+    return [json.dumps(get_time(scenario)).encode("ascii")]

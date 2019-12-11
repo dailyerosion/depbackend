@@ -1,11 +1,10 @@
-#!/usr/bin/env python
 """GeoJSON service for HUC12 data"""
 import json
-import cgi
 import datetime
 
 import memcache
-from pyiem.util import get_dbconn, ssw
+from paste.request import parse_formvars
+from pyiem.util import get_dbconn
 
 
 def do(huc12, mode):
@@ -65,26 +64,22 @@ def do(huc12, mode):
     return json.dumps(res)
 
 
-def main():
+def application(environ, start_response):
     """Do Fun things"""
-    ssw("Content-Type: application/vnd.geo+json\n\n")
-    form = cgi.FieldStorage()
-    cb = form.getfirst("callback", None)
-    huc12 = form.getfirst("huc12", "000000000000")[:12]
-    mode = form.getfirst("mode", "daily")
+    headers = [("Content-Type", "application/vnd.geo+json")]
+    start_response("200 OK", headers)
+    form = parse_formvars(environ)
+    cb = form.get("callback", None)
+    huc12 = form.get("huc12", "000000000000")[:12]
+    mode = form.get("mode", "daily")
 
-    mckey = ("/geojson/huc12_events/%s/%s") % (huc12, mode)
+    mckey = "/geojson/huc12_events/%s/%s" % (huc12, mode)
     mc = memcache.Client(["iem-memcached:11211"], debug=0)
     res = mc.get(mckey)
     if not res:
         res = do(huc12, mode)
         mc.set(mckey, res, 15)
 
-    if cb is None:
-        ssw(res)
-    else:
-        ssw("%s(%s)" % (cb, res))
-
-
-if __name__ == "__main__":
-    main()
+    if cb is not None:
+        res = "%s(%s)" % (cb, res)
+    return [res.encode("ascii")]

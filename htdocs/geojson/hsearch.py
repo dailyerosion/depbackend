@@ -1,8 +1,8 @@
-#!/usr/bin/env python
-import cgi
+"""search for HUC12 by name."""
 import json
 
-from pyiem.util import get_dbconn, ssw
+from paste.request import parse_formvars
+from pyiem.util import get_dbconn
 
 
 def search(q):
@@ -21,14 +21,11 @@ def search(q):
     return d
 
 
-def main():
+def application(environ, start_response):
     """DO Something"""
-    form = cgi.FieldStorage()
-    q = form.getfirst("q", "")
-    ssw("Content-type: application/json\n\n")
+    form = parse_formvars(environ)
+    q = form.get("q", "")
+    headers = [("Content-type", "application/json")]
+    start_response("200 OK", headers)
 
-    ssw(json.dumps(search(q)))
-
-
-if __name__ == "__main__":
-    main()
+    return [json.dumps(search(q)).encode("ascii")]

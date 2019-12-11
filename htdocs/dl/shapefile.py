@@ -1,18 +1,17 @@
-#!/usr/bin/env python
 """
 Called from DEP map application
 """
-import cgi
 import datetime
 import os
 import shutil
 import zipfile
 
 from geopandas import GeoDataFrame
-from pyiem.util import get_dbconn, ssw
+from paste.request import parse_formvars
+from pyiem.util import get_dbconn
 
 
-def workflow(dt, dt2, states):
+def workflow(start_response, dt, dt2, states):
     """Generate for a given date """
     dbconn = get_dbconn("idep")
     dextra = "valid = %s"
@@ -72,26 +71,25 @@ def workflow(dt, dt2, states):
         zfp.write("%s.%s" % (fn, suffix))
     zfp.close()
 
-    ssw("Content-type: application/octet-stream\n")
-    ssw("Content-Disposition: attachment; filename=%s.zip\n\n" % (fn,))
-
-    ssw(open(fn + ".zip", "rb").read())
+    headers = [
+        ("Content-type", "application/octet-stream"),
+        ("Content-Disposition", "attachment; filename=%s.zip" % (fn,)),
+    ]
+    start_response("200 OK", headers)
+    res = open(fn + ".zip", "rb").read()
 
     suffixes.append("zip")
     for suffix in suffixes:
         os.remove("%s.%s" % (fn, suffix))
+    return res
 
 
-def main():
+def application(environ, start_response):
     """Generate something nice for the users"""
-    form = cgi.FieldStorage()
-    dt = datetime.datetime.strptime(form.getfirst("dt"), "%Y-%m-%d")
-    dt2 = form.getfirst("dt2")
-    states = form.getfirst("states")
+    form = parse_formvars(environ)
+    dt = datetime.datetime.strptime(form.get("dt", "2019-12-11"), "%Y-%m-%d")
+    dt2 = form.get("dt2")
+    states = form.get("states")
     if dt2 is not None:
-        dt2 = datetime.datetime.strptime(form.getfirst("dt2"), "%Y-%m-%d")
-    workflow(dt, dt2, states)
-
-
-if __name__ == "__main__":
-    main()
+        dt2 = datetime.datetime.strptime(form.get("dt2"), "%Y-%m-%d")
+    return [workflow(start_response, dt, dt2, states)]
