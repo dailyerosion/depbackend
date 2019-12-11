@@ -90,7 +90,10 @@ def do(ts, ts2, domain):
             myramp = RAMPS["english"][2]
 
     res["jenks"] = dict(
-        avg_loss=myramp, qc_precip=myramp, avg_delivery=myramp, avg_runoff=myramp
+        avg_loss=myramp,
+        qc_precip=myramp,
+        avg_delivery=myramp,
+        avg_runoff=myramp,
     )
     res["max_values"] = dict(
         avg_loss=max(avg_loss),
@@ -107,7 +110,9 @@ def main():
     form = cgi.FieldStorage()
     cb = form.getfirst("callback", None)
     domain = form.getfirst("domain", None)
-    ts = datetime.datetime.strptime(form.getfirst("date", "2015-05-05"), "%Y-%m-%d")
+    ts = datetime.datetime.strptime(
+        form.getfirst("date", "2015-05-05"), "%Y-%m-%d"
+    )
     ts2 = None
     if form.getfirst("date2", None) is not None:
         ts2 = datetime.datetime.strptime(form.getfirst("date2"), "%Y-%m-%d")

@@ -27,7 +27,9 @@ def get_time(scenario):
     if cursor.rowcount == 1:
         row = cursor.fetchone()
         d["first_date"] = datetime.date(2007, 1, 1).strftime(ISO)
-        d["last_date"] = datetime.datetime.strptime(row[0], "%Y-%m-%d").strftime(ISO)
+        d["last_date"] = datetime.datetime.strptime(
+            row[0], "%Y-%m-%d"
+        ).strftime(ISO)
 
     return d
 

@@ -43,7 +43,10 @@ def main():
         return
 
     ssw("Content-type: application/octet-stream\n")
-    ssw("Content-Disposition: attachment; filename=%s\n\n" % (fn.split("/")[-1],))
+    ssw(
+        "Content-Disposition: attachment; filename=%s\n\n"
+        % (fn.split("/")[-1],)
+    )
     ssw(open(fn).read())
 
 

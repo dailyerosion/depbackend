@@ -61,7 +61,9 @@ def workflow(dt, dt2, states):
     fn = "idepv2_%s" % (dt.strftime("%Y%m%d"),)
     if dt2:
         fn += dt2.strftime("_%Y%m%d")
-    df.columns = [s.upper() if s != "simple_geom" else s for s in df.columns.values]
+    df.columns = [
+        s.upper() if s != "simple_geom" else s for s in df.columns.values
+    ]
     df.to_file(fn + ".shp")
     shutil.copyfile("/opt/iem/data/gis/meta/5070.prj", fn + ".prj")
     zfp = zipfile.ZipFile(fn + ".zip", "w", zipfile.ZIP_DEFLATED)
