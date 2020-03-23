@@ -28,10 +28,9 @@
   </Directory>
 
   <Directory "/opt/depbackend/htdocs/auto">
-
-    RewriteRule ^([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]+)_(.*).png$ map.wsgi?year=$1&month=$2&day=$3&year2=$4&month2=$5&day2=$6&scenario=$7&v=$8
-    RewriteRule ^huc([0-9]{8,12})_([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]+)_(.*).png$ map.wsgi?year=$2&month=$3&day=$4&year2=$5&month2=$6&day2=$7&scenario=$8&v=$9&huc=$1
-    RewriteRule ^([0-9]{8,12})_report.pdf$ huc12report.py?huc=$1
+    RewriteRule ^([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]+)_(.*).png$ mapper.py?year=$1&month=$2&day=$3&year2=$4&month2=$5&day2=$6&scenario=$7&v=$8 [QSA]
+    RewriteRule ^huc([0-9]{8,12})_([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]+)_(.*).png$ mapper.py?year=$2&month=$3&day=$4&year2=$5&month2=$6&day2=$7&scenario=$8&v=$9&huc=$1 [QSA]
+    RewriteRule ^([0-9]{8,12})_report.pdf$ huc12report.py?huc=$1 [QSA]
   </Directory>
 
   <Directory "/opt/depbackend/htdocs/geojson">
