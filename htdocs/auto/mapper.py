@@ -273,8 +273,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
     m = MapPlot(
         axisbg="#EEEEEE",
         nologo=True,
-        sector="state",
-        state="MN",
+        sector="custom",
         south=pts[0, 1],
         north=pts[1, 1],
         west=pts[0, 0],
