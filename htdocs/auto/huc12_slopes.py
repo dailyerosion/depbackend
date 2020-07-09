@@ -1,20 +1,17 @@
-#!/usr/bin/env python
 """Mapping Interface"""
-import cgi
 import os
 import glob
 from io import BytesIO
 
 import numpy as np
+from paste.request import parse_formvars
 from pyiem.plot.use_agg import plt
-from pyiem.util import ssw
 from pyiem.dep import read_slp
+import seaborn as sns
 
 
 def make_plot(huc12, scenario):
     """Make the map"""
-    import seaborn as sns
-
     os.chdir("/i/%s/slp/%s/%s" % (scenario, huc12[:8], huc12[8:]))
     res = []
     for fn in glob.glob("*.slp"):
@@ -47,17 +44,11 @@ def make_plot(huc12, scenario):
     return ram.read()
 
 
-def main():
+def application(environ, start_response):
     """Do something fun"""
-    form = cgi.FieldStorage()
-    huc12 = form.getfirst("huc12", "000000000000")[:12]
-    scenario = int(form.getfirst("scenario", 0))
+    form = parse_formvars(environ)
+    huc12 = form.get("huc12", "000000000000")[:12]
+    scenario = int(form.get("scenario", 0))
 
-    ssw("Content-type: image/png\n\n")
-    ssw(make_plot(huc12, scenario))
-
-
-if __name__ == "__main__":
-    # See how we are called
-    main()
-    # make_plot('070801050306', 0)
+    start_response("200 OK", [("Content-type", "image/png")])
+    return [make_plot(huc12, scenario)]

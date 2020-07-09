@@ -1,12 +1,11 @@
-#!/usr/bin/env python
 """Generate a PDF Report for a given HUC12."""
 from io import BytesIO
 import datetime
-import cgi
 import calendar
 
 import requests
 from metpy.units import units
+from paste.request import parse_formvars
 from pandas.io.sql import read_sql
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -20,11 +19,13 @@ from reportlab.platypus import (
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
-from pyiem.util import ssw, get_dbconn
+from pyiem.util import get_dbconn
 
 PAGE_WIDTH = letter[0]
 PAGE_HEIGHT = letter[1]
 GENTIME = datetime.datetime.now().strftime("%B %-d %Y")
+HOST = "http://depbackend.local"
+MAPPER = f"{HOST}/auto/mapper.py"
 INTROTEXT = (
     "The Daily Erosion Project generates estimates of sheet and rill "
     "erosion.  This PDF summarizes our model results.  All results should be "
@@ -96,14 +97,12 @@ def generate_run_metadata(huc12):
     for year in range(2016, 2019):
         df = read_sql(
             """
-        select lu"""
-            + str(year)
-            + """ as datum, count(*) from
+        select substr(landuse, %s, 1) as datum, count(*) from
         flowpath_points p JOIN flowpaths f on (p.flowpath = f.fid)
         WHERE f.huc_12 = %s and f.scenario = 0 GROUP by datum
         """,
             pgconn,
-            params=(huc12,),
+            params=(year - 2007 + 1, huc12),
             index_col="datum",
         )
         total = df["count"].sum()
@@ -127,11 +126,7 @@ def generate_run_metadata(huc12):
                     [
                         Image(
                             get_image_bytes(
-                                (
-                                    "http://dailyerosion.local/"
-                                    "auto/huc12_slopes.py?huc12=%s"
-                                )
-                                % (huc12,)
+                                f"{HOST}/auto/huc12_slopes.py?huc12={huc12}"
                             ),
                             width=3.6 * inch,
                             height=2.4 * inch,
@@ -337,7 +332,9 @@ def draw_header(canvas, doc, huc12):
     """Do our header stuff"""
     canvas.saveState()
     canvas.drawImage(
-        "../images/logo_horiz_white.png", inch * 1.0, PAGE_HEIGHT - 100
+        "/opt/depbackend/htdocs/images/logo_horiz_white.png",
+        inch * 1.0,
+        PAGE_HEIGHT - 100,
     )
     canvas.setFont("Times-Bold", 16)
     canvas.drawString(
@@ -368,10 +365,10 @@ def get_image_bytes(uri):
     return image
 
 
-def main():
+def application(environ, start_response):
     """See how we are called"""
-    form = cgi.FieldStorage()
-    huc12 = form.getfirst("huc", "070801050306")[:12]
+    form = parse_formvars(environ)
+    huc12 = form.get("huc", "070801050306")[:12]
     ishuc12 = len(huc12) == 12
     bio = BytesIO()
     styles = getSampleStyleSheet()
@@ -387,11 +384,7 @@ def main():
                     [
                         Image(
                             get_image_bytes(
-                                (
-                                    "http://dailyerosion.local/"
-                                    "auto/map.wsgi?overview=1&huc=%s&zoom=250"
-                                )
-                                % (huc12,)
+                                f"{MAPPER}?overview=1&huc={huc12}&zoom=250"
                             ),
                             width=3.6 * inch,
                             height=2.4 * inch,
@@ -403,11 +396,7 @@ def main():
                     [
                         Image(
                             get_image_bytes(
-                                (
-                                    "http://dailyerosion.local/"
-                                    "auto/map.wsgi?overview=1&huc=%s&zoom=11"
-                                )
-                                % (huc12,)
+                                f"{MAPPER}?overview=1&huc={huc12}&zoom=11"
                             ),
                             width=3.6 * inch,
                             height=2.4 * inch,
@@ -458,9 +447,5 @@ def main():
         draw_header(canvas, doc, huc12)
 
     doc.build(story, onFirstPage=pagecb, onLaterPages=pagecb)
-    ssw("Content-type: application/pdf\n\n")
-    ssw(bio.getvalue())
-
-
-if __name__ == "__main__":
-    main()
+    start_response("200 OK", [("Content-type", "application/pdf")])
+    return [bio.getvalue()]

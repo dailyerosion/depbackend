@@ -1,20 +1,15 @@
-#!/usr/bin/env python
 """Mapping Interface"""
-import cgi
 from io import BytesIO
 import calendar
 
 import numpy as np
-from pyiem.util import get_dbconn, ssw
+from paste.request import parse_formvars
+from pyiem.plot.use_agg import plt
+from pyiem.util import get_dbconn
 
 
 def make_plot(huc12, scenario):
     """Make the map"""
-    import matplotlib
-
-    matplotlib.use("agg")
-    import matplotlib.pyplot as plt
-
     pgconn = get_dbconn("idep")
     cursor = pgconn.cursor()
 
@@ -71,16 +66,11 @@ def make_plot(huc12, scenario):
     return ram.read()
 
 
-def main():
+def application(environ, start_response):
     """Do something fun"""
-    form = cgi.FieldStorage()
-    huc12 = form.getfirst("huc12", "000000000000")[:12]
-    scenario = int(form.getfirst("scenario", 0))
+    form = parse_formvars(environ)
+    huc12 = form.get("huc12", "000000000000")[:12]
+    scenario = int(form.get("scenario", 0))
 
-    ssw("Content-type: image/png\n\n")
-    ssw(make_plot(huc12, scenario))
-
-
-if __name__ == "__main__":
-    # See how we are called
-    main()
+    start_response("200 OK", [("Content-type", "image/png")])
+    return [make_plot(huc12, scenario)]

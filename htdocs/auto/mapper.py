@@ -390,7 +390,7 @@ def main(environ):
     mc = memcache.Client(["iem-memcached:11211"], debug=0)
     res = mc.get(mckey)
     hostname = environ.get("SERVER_NAME", "")
-    if not res or hostname == "dailyerosion.local":
+    if not res or hostname == "depbackend.local":
         # Lazy import to help speed things up
         if form.get("overview"):
             res, do_cache = make_overviewmap(form)
