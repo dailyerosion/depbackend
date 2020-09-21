@@ -205,11 +205,9 @@ def make_map(huc, ts, ts2, scenario, v, form):
         # 11 years of data is standard
         # 10 years is for the switchgrass one-off
         df = read_postgis(
-            """
+            f"""
         WITH data as (
-        SELECT huc_12, sum("""
-            + v
-            + """) / 10. as d from results_by_huc12
+        SELECT huc_12, sum({v}) / 10. as d from results_by_huc12
         WHERE scenario = %s and to_char(valid, 'mmdd') between %s and %s
         and valid between '2008-01-01' and '2018-01-01'
         GROUP by huc_12)
@@ -217,10 +215,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
         SELECT ST_Transform(simple_geom, %s) as geom,
         coalesce(d.d, 0) * %s as data
         from huc12 i LEFT JOIN data d
-        ON (i.huc_12 = d.huc_12) WHERE i.scenario = %s
-        """
-            + huclimiter
-            + """
+        ON (i.huc_12 = d.huc_12) WHERE i.scenario = %s {huclimiter}
         """,
             pgconn,
             params=(
@@ -236,21 +231,16 @@ def make_map(huc, ts, ts2, scenario, v, form):
 
     else:
         df = read_postgis(
-            """
+            f"""
         WITH data as (
-        SELECT huc_12, sum("""
-            + v
-            + """)  as d from results_by_huc12
+        SELECT huc_12, sum({v})  as d from results_by_huc12
         WHERE scenario = %s and valid between %s and %s
         GROUP by huc_12)
 
         SELECT ST_Transform(simple_geom, %s) as geom,
         coalesce(d.d, 0) * %s as data
         from huc12 i LEFT JOIN data d
-        ON (i.huc_12 = d.huc_12) WHERE i.scenario = %s
-        """
-            + huclimiter
-            + """
+        ON (i.huc_12 = d.huc_12) WHERE i.scenario = %s {huclimiter}
         """,
             pgconn,
             params=(
@@ -294,7 +284,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
             row["geom"].exterior,
             fc=cmap(norm([row["data"]]))[0],
             ec="k",
-            zorder=2,
+            zorder=5,
             lw=0.1,
         )
         m.ax.add_patch(p)
@@ -345,8 +335,8 @@ def make_map(huc, ts, ts2, scenario, v, form):
         # Crude conversion of T/a to mm depth
         depth = avgval / 5.0
         m.ax.text(
-            0.5,
-            0.5,
+            0.8,
+            0.3,
             "%.2fmm" % (depth,),
             zorder=1000,
             fontsize=40,
