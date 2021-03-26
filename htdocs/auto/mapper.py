@@ -3,13 +3,12 @@ import sys
 import datetime
 from io import BytesIO
 
-import numpy as np
 import memcache
 from paste.request import parse_formvars
 from matplotlib.patches import Polygon, Rectangle
 import matplotlib.colors as mpcolors
 from geopandas import read_postgis
-import cartopy.crs as ccrs
+from pyiem.reference import EPSG
 from pyiem.plot.use_agg import plt
 from pyiem.plot.geoplot import MapPlot, Z_OVERLAY2
 from pyiem.plot.colormaps import james, dep_erosion
@@ -40,7 +39,7 @@ def make_overviewmap(form):
     """Draw a pretty map of just the HUC."""
     huc = form.get("huc")
     plt.close()
-    projection = ccrs.Mercator()
+    projection = EPSG[5070]
     if huc is None:
         huclimiter = ""
     elif len(huc) >= 8:
@@ -48,7 +47,7 @@ def make_overviewmap(form):
     pgconn = get_dbconn("idep")
     df = read_postgis(
         """
-        SELECT ST_Transform(simple_geom, %s) as geom, huc_12,
+        SELECT simple_geom as geom, huc_12,
         ST_x(ST_Transform(ST_Centroid(geom), 4326)) as centroid_x,
         ST_y(ST_Transform(ST_Centroid(geom), 4326)) as centroid_y,
         hu_12_name
@@ -57,17 +56,11 @@ def make_overviewmap(form):
         + """
     """,
         pgconn,
-        params=(3857,),
         geom_col="geom",
         index_col="huc_12",
     )
     minx, miny, maxx, maxy = df["geom"].total_bounds
     buf = float(form.get("zoom", 10.0)) * 1000.0  # 10km
-    pts = ccrs.Geodetic().transform_points(
-        projection,
-        np.asarray([minx - buf, maxx + buf]),
-        np.asarray([miny - buf, maxy + buf]),
-    )
     hucname = "" if huc not in df.index else df.at[huc, "hu_12_name"]
     subtitle = "The HUC8 is in tan"
     if len(huc) == 12:
@@ -76,10 +69,10 @@ def make_overviewmap(form):
         axisbg="#EEEEEE",
         nologo=True,
         sector="custom",
-        south=pts[0, 1],
-        north=pts[1, 1],
-        west=pts[0, 0],
-        east=pts[1, 0],
+        south=miny - buf,
+        north=maxy + buf,
+        west=minx - buf,
+        east=maxx + buf,
         projection=projection,
         continentalcolor="white",
         title="DEP HUC %s:: %s" % (huc, hucname),
@@ -139,6 +132,7 @@ def label_scenario(ax, scenario, pgconn):
 
 def make_map(huc, ts, ts2, scenario, v, form):
     """Make the map"""
+    projection = EPSG[5070]
     plt.close()
     # suggested for runoff and precip
     if v in ["qc_precip", "avg_runoff"]:
@@ -167,8 +161,6 @@ def make_map(huc, ts, ts2, scenario, v, form):
                 ts.strftime("%-d %b"),
                 ts2.strftime("%-d %b"),
             )
-
-    projection = ccrs.Mercator()
 
     # Check that we have data for this date!
     cursor.execute(
@@ -212,7 +204,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
         and valid between '2008-01-01' and '2018-01-01'
         GROUP by huc_12)
 
-        SELECT ST_Transform(simple_geom, %s) as geom,
+        SELECT simple_geom as geom,
         coalesce(d.d, 0) * %s as data
         from huc12 i LEFT JOIN data d
         ON (i.huc_12 = d.huc_12) WHERE i.scenario = %s {huclimiter}
@@ -222,7 +214,6 @@ def make_map(huc, ts, ts2, scenario, v, form):
                 scenario,
                 ts.strftime("%m%d"),
                 ts2.strftime("%m%d"),
-                3857,
                 V2MULTI[v],
                 0,
             ),
@@ -237,7 +228,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
         WHERE scenario = %s and valid between %s and %s
         GROUP by huc_12)
 
-        SELECT ST_Transform(simple_geom, %s) as geom,
+        SELECT simple_geom as geom,
         coalesce(d.d, 0) * %s as data
         from huc12 i LEFT JOIN data d
         ON (i.huc_12 = d.huc_12) WHERE i.scenario = %s {huclimiter}
@@ -247,7 +238,6 @@ def make_map(huc, ts, ts2, scenario, v, form):
                 scenario,
                 ts.strftime("%Y-%m-%d"),
                 ts2.strftime("%Y-%m-%d"),
-                3857,
                 V2MULTI[v],
                 0,
             ),
@@ -255,19 +245,14 @@ def make_map(huc, ts, ts2, scenario, v, form):
         )
     minx, miny, maxx, maxy = df["geom"].total_bounds
     buf = 10000.0  # 10km
-    pts = ccrs.Geodetic().transform_points(
-        projection,
-        np.asarray([minx - buf, maxx + buf]),
-        np.asarray([miny - buf, maxy + buf]),
-    )
     m = MapPlot(
         axisbg="#EEEEEE",
         nologo=True,
         sector="custom",
-        south=pts[0, 1],
-        north=pts[1, 1],
-        west=pts[0, 0],
-        east=pts[1, 0],
+        south=miny - buf,
+        north=maxy + buf,
+        west=minx - buf,
+        east=maxx + buf,
         projection=projection,
         title="DEP %s by HUC12 %s" % (V2NAME[v], title),
         titlefontsize=16,
@@ -335,11 +320,11 @@ def make_map(huc, ts, ts2, scenario, v, form):
         # Crude conversion of T/a to mm depth
         depth = avgval / 5.0
         m.ax.text(
-            0.8,
-            0.3,
+            0.9,
+            0.92,
             "%.2fmm" % (depth,),
             zorder=1000,
-            fontsize=40,
+            fontsize=24,
             transform=m.ax.transAxes,
             ha="center",
             va="center",
