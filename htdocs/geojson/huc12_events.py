@@ -25,7 +25,7 @@ def do(huc12, mode):
     else:
         cursor.execute(
             """
-            SELECT extract(year from valid) as yr,
+            SELECT extract(year from valid)::int as yr,
             sum(avg_loss) * 4.463,
             sum(avg_delivery) * 4.463,
             sum(qc_precip) / 25.4,
@@ -46,7 +46,7 @@ def do(huc12, mode):
     }
     for row in cursor:
         dt = row[0]
-        if isinstance(row[0], float):
+        if isinstance(row[0], int):
             dt = datetime.date(int(row[0]), 1, 1)
         res["results"].append(
             dict(
