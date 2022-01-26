@@ -12,7 +12,7 @@ from pyiem.util import get_dbconn
 
 
 def workflow(start_response, dt, dt2, states):
-    """Generate for a given date """
+    """Generate for a given date"""
     dbconn = get_dbconn("idep")
     dextra = "valid = %s"
     args = (dt,)
