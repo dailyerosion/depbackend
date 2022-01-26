@@ -46,14 +46,12 @@ def make_overviewmap(form):
         huclimiter = " and substr(huc_12, 1, 8) = '%s' " % (huc[:8],)
     pgconn = get_dbconn("idep")
     df = read_postgis(
-        """
+        f"""
         SELECT simple_geom as geom, huc_12,
         ST_x(ST_Transform(ST_Centroid(geom), 4326)) as centroid_x,
         ST_y(ST_Transform(ST_Centroid(geom), 4326)) as centroid_y,
         hu_12_name
-        from huc12 i WHERE i.scenario = 0 """
-        + huclimiter
-        + """
+        from huc12 i WHERE i.scenario = 0 {huclimiter}
     """,
         pgconn,
         geom_col="geom",
@@ -67,7 +65,7 @@ def make_overviewmap(form):
         subtitle = "HUC12 highlighted in red, the HUC8 it resides in is in tan"
     m = MapPlot(
         axisbg="#EEEEEE",
-        nologo=True,
+        logo="dep",
         sector="custom",
         south=miny - buf,
         north=maxy + buf,
@@ -83,7 +81,7 @@ def make_overviewmap(form):
     )
     for _huc12, row in df.iterrows():
         p = Polygon(
-            row["geom"].exterior,
+            row["geom"].exterior.coords,
             fc="red" if _huc12 == huc else "tan",
             ec="k",
             zorder=Z_OVERLAY2,
@@ -164,9 +162,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
 
     # Check that we have data for this date!
     cursor.execute(
-        """
-        SELECT value from properties where key = 'last_date_0'
-    """
+        "SELECT value from properties where key = 'last_date_0'",
     )
     lastts = datetime.datetime.strptime(cursor.fetchone()[0], "%Y-%m-%d")
     floor = datetime.date(2007, 1, 1)
@@ -247,7 +243,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
     buf = 10000.0  # 10km
     m = MapPlot(
         axisbg="#EEEEEE",
-        nologo=True,
+        logo="dep",
         sector="custom",
         south=miny - buf,
         north=maxy + buf,
@@ -266,7 +262,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
     norm = mpcolors.BoundaryNorm(bins, cmap.N)
     for _, row in df.iterrows():
         p = Polygon(
-            row["geom"].exterior,
+            row["geom"].exterior.coords,
             fc=cmap(norm([row["data"]]))[0],
             ec="k",
             zorder=5,
