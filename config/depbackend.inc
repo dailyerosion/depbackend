@@ -1,4 +1,5 @@
-# Apache Include for common dailyerosion.org stuff
+Include /opt/iemwebfarm/config/vhost_common.conf
+
   DocumentRoot /opt/depbackend/htdocs
   ServerAdmin akrherz@iastate.edu
 
@@ -55,14 +56,6 @@
     RewriteRule "^slopes([0-9]+)_([0-9]{12})_([0-9A-Z]+).png$" "slopes.py?scenario=$1&huc_12=$2&model_twp=$3"
   </Directory>
 
-
-  # Since RHEL Apache does not log 404s, sigh
-  ErrorDocument 404 /http_errors/error404.php
-
-  <Location "/http_errors/">
-    # https://bz.apache.org/bugzilla/show_bug.cgi?id=55415
-    ProxyErrorOverride Off
-  </Location>
 
   # http://enable-cors.org/server_apache.html
   Header set Access-Control-Allow-Origin "*"
