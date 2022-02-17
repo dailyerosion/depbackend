@@ -6,7 +6,7 @@ import calendar
 import requests
 from metpy.units import units
 from paste.request import parse_formvars
-from pandas.io.sql import read_sql
+import pandas as pd
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
@@ -19,7 +19,7 @@ from reportlab.platypus import (
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
-from pyiem.util import get_dbconn
+from pyiem.util import get_sqlalchemy_conn, get_dbconn
 
 PAGE_WIDTH = letter[0]
 PAGE_HEIGHT = letter[1]
@@ -74,7 +74,8 @@ def generate_run_metadata(huc12):
     res.append(
         Paragraph(
             (
-                "The Daily Erosion Project models %s hill slopes within this HUC12."
+                "The Daily Erosion Project models %s hill slopes within "
+                "this HUC12."
                 "These slopes range in length from %.1f to %.1f meters "
                 "(%.1f to %.1f feet) with an overall average of %.1f meters "
                 "(%.1f feet)."
@@ -95,16 +96,17 @@ def generate_run_metadata(huc12):
     # Something about managements and crops
     rows = [["Year", "Corn", "Soybean", "Pasture", "Other"]]
     for year in range(2016, 2019):
-        df = read_sql(
-            """
-        select substr(landuse, %s, 1) as datum, count(*) from
-        flowpath_points p JOIN flowpaths f on (p.flowpath = f.fid)
-        WHERE f.huc_12 = %s and f.scenario = 0 GROUP by datum
-        """,
-            pgconn,
-            params=(year - 2007 + 1, huc12),
-            index_col="datum",
-        )
+        with get_sqlalchemy_conn("idep") as conn:
+            df = pd.read_sql(
+                """
+            select substr(landuse, %s, 1) as datum, count(*) from
+            flowpath_points p JOIN flowpaths f on (p.flowpath = f.fid)
+            WHERE f.huc_12 = %s and f.scenario = 0 GROUP by datum
+            """,
+                conn,
+                params=(year - 2007 + 1, huc12),
+                index_col="datum",
+            )
         total = df["count"].sum()
         leftover = total
         rows.append([year])
@@ -133,8 +135,9 @@ def generate_run_metadata(huc12):
                         ),
                         Paragraph(
                             (
-                                "Figure 3: This plot shows the most dominate combination of slope "
-                                "length and general steepness in the watershed."
+                                "Figure 3: This plot shows the most dominate "
+                                "combination of slope length and general "
+                                "steepness in the watershed."
                             ),
                             styles["Normal"],
                         ),
@@ -145,9 +148,10 @@ def generate_run_metadata(huc12):
                         Table(rows),
                         Paragraph(
                             (
-                                "Table 1: Estimated cropping percentage based on modelled "
-                                "hillslopes.  The 'Other' column represents all other cropping "
-                                "types supported by DEP."
+                                "Table 1: Estimated cropping percentage based "
+                                "on modelled hillslopes.  The 'Other' column "
+                                "represents all other cropping types "
+                                "supported by DEP."
                             ),
                             styles["Normal"],
                         ),
@@ -188,40 +192,37 @@ def generate_monthly_summary_table(huc12):
             "[days]",
         ]
     )
-    pgconn = get_dbconn("idep")
     huc12col = "huc_12"
     if len(huc12) == 8:
         huc12col = "substr(huc_12, 1, 8)"
-    df = read_sql(
-        """
-    WITH data as (
-        SELECT extract(year from valid)::int as year,
-        extract(month from valid)::int as month, huc_12,
-        (sum(qc_precip) / 25.4)::numeric as sum_qc_precip,
-        (sum(avg_runoff) / 25.4)::numeric as sum_avg_runoff,
-        (sum(avg_loss) * 4.463)::numeric as sum_avg_loss,
-        (sum(avg_delivery) * 4.463)::numeric as sum_avg_delivery,
-        sum(case when qc_precip >= 50.8 then 1 else 0 end) as pdays,
-        sum(case when avg_loss > 0 then 1 else 0 end) as events
-        from results_by_huc12 WHERE scenario = 0 and
-        """
-        + huc12col
-        + """ = %s
-        and valid >= '2016-01-01'
-        GROUP by year, month, huc_12)
-    SELECT year, month,
-    round(avg(sum_qc_precip), 2),
-    round(avg(sum_avg_runoff), 2),
-    round(avg(sum_avg_loss), 2),
-    round(avg(sum_avg_delivery), 2),
-    round(avg(pdays)::numeric, 1),
-    round(avg(events)::numeric, 1)
-    from data GROUP by year, month ORDER by year, month
-    """,
-        pgconn,
-        params=(huc12,),
-        index_col=None,
-    )
+    with get_sqlalchemy_conn("idep") as conn:
+        df = pd.read_sql(
+            f"""
+        WITH data as (
+            SELECT extract(year from valid)::int as year,
+            extract(month from valid)::int as month, huc_12,
+            (sum(qc_precip) / 25.4)::numeric as sum_qc_precip,
+            (sum(avg_runoff) / 25.4)::numeric as sum_avg_runoff,
+            (sum(avg_loss) * 4.463)::numeric as sum_avg_loss,
+            (sum(avg_delivery) * 4.463)::numeric as sum_avg_delivery,
+            sum(case when qc_precip >= 50.8 then 1 else 0 end) as pdays,
+            sum(case when avg_loss > 0 then 1 else 0 end) as events
+            from results_by_huc12 WHERE scenario = 0 and {huc12col} = %s
+            and valid >= '2016-01-01'
+            GROUP by year, month, huc_12)
+        SELECT year, month,
+        round(avg(sum_qc_precip), 2),
+        round(avg(sum_avg_runoff), 2),
+        round(avg(sum_avg_loss), 2),
+        round(avg(sum_avg_delivery), 2),
+        round(avg(pdays)::numeric, 1),
+        round(avg(events)::numeric, 1)
+        from data GROUP by year, month ORDER by year, month
+        """,
+            conn,
+            params=(huc12,),
+            index_col=None,
+        )
     for _, row in df.iterrows():
         vals = [int(row["year"]), calendar.month_abbr[int(row["month"])]]
         vals.extend(["%.2f" % (f,) for f in list(row)[2:-2]])
@@ -271,39 +272,36 @@ def generate_summary_table(huc12):
             "[days]",
         ]
     )
-    pgconn = get_dbconn("idep")
     huc12col = "huc_12"
     if len(huc12) == 8:
         huc12col = "substr(huc_12, 1, 8)"
-    df = read_sql(
-        """
-    WITH data as (
-        SELECT extract(year from valid)::int as year, huc_12,
-        (sum(qc_precip) / 25.4)::numeric as sum_qc_precip,
-        (sum(avg_runoff) / 25.4)::numeric as sum_avg_runoff,
-        (sum(avg_loss) * 4.463)::numeric as sum_avg_loss,
-        (sum(avg_delivery) * 4.463)::numeric as sum_avg_delivery,
-        sum(case when qc_precip >= 50.8 then 1 else 0 end) as pdays,
-        sum(case when avg_loss > 0 then 1 else 0 end) as events
-        from results_by_huc12 WHERE scenario = 0 and
-        """
-        + huc12col
-        + """ = %s
-        and valid >= '2008-01-01'
-        GROUP by year, huc_12)
-    SELECT year,
-    round(avg(sum_qc_precip), 2),
-    round(avg(sum_avg_runoff), 2),
-    round(avg(sum_avg_loss), 2),
-    round(avg(sum_avg_delivery), 2),
-    round(avg(pdays)::numeric, 1),
-    round(avg(events)::numeric, 1)
-    from data GROUP by year ORDER by year
-    """,
-        pgconn,
-        params=(huc12,),
-        index_col="year",
-    )
+    with get_sqlalchemy_conn("idep") as conn:
+        df = pd.read_sql(
+            f"""
+        WITH data as (
+            SELECT extract(year from valid)::int as year, huc_12,
+            (sum(qc_precip) / 25.4)::numeric as sum_qc_precip,
+            (sum(avg_runoff) / 25.4)::numeric as sum_avg_runoff,
+            (sum(avg_loss) * 4.463)::numeric as sum_avg_loss,
+            (sum(avg_delivery) * 4.463)::numeric as sum_avg_delivery,
+            sum(case when qc_precip >= 50.8 then 1 else 0 end) as pdays,
+            sum(case when avg_loss > 0 then 1 else 0 end) as events
+            from results_by_huc12 WHERE scenario = 0 and {huc12col} = %s
+            and valid >= '2008-01-01'
+            GROUP by year, huc_12)
+        SELECT year,
+        round(avg(sum_qc_precip), 2),
+        round(avg(sum_avg_runoff), 2),
+        round(avg(sum_avg_loss), 2),
+        round(avg(sum_avg_delivery), 2),
+        round(avg(pdays)::numeric, 1),
+        round(avg(events)::numeric, 1)
+        from data GROUP by year ORDER by year
+        """,
+            conn,
+            params=(huc12,),
+            index_col="year",
+        )
     for year, row in df.iterrows():
         vals = [year]
         vals.extend(["%.2f" % (f,) for f in list(row)[:-2]])

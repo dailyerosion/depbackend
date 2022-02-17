@@ -2,7 +2,7 @@
 import json
 import datetime
 
-import memcache
+from pymemcache.client import Client
 from paste.request import parse_formvars
 from pyiem.util import get_dbconn
 
@@ -74,12 +74,14 @@ def application(environ, start_response):
     mode = form.get("mode", "daily")
 
     mckey = "/geojson/huc12_events/%s/%s" % (huc12, mode)
-    mc = memcache.Client(["iem-memcached:11211"], debug=0)
+    mc = Client(["iem-memcached", 11211])
     res = mc.get(mckey)
-    if not res:
+    if res is None:
         res = do(huc12, mode)
         mc.set(mckey, res, 15)
-
+    else:
+        res = res.decode("utf-8")
+    mc.close()
     if cb is not None:
         res = "%s(%s)" % (cb, res)
     return [res.encode("ascii")]

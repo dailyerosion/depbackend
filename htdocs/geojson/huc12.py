@@ -1,7 +1,7 @@
 """GeoJSON service for HUC12 data"""
 import datetime
 
-import memcache
+from pymemcache.client import Client
 
 # needed for Decimal formatting to work
 import simplejson as json
@@ -114,12 +114,14 @@ def application(environ, start_response):
     tkey = "" if ts2 is None else ts2.strftime("%Y%m%d")
     dkey = "" if domain is None else domain
     mckey = f"/geojson/huc12/{ts:%Y%m%d}/{tkey}/{dkey}"
-    mc = memcache.Client(["iem-memcached:11211"], debug=0)
+    mc = Client(["iem-memcached", 11211])
     res = mc.get(mckey)
-    if not res:
+    if res is None:
         res = do(ts, ts2, domain)
         mc.set(mckey, res, 3600)
-
+    else:
+        res = res.decode("utf-8")
+    mc.close()
     if cb is not None:
         res = f"{cb}({res})"
     return [res.encode("ascii")]
