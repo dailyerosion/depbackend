@@ -3,7 +3,7 @@ import sys
 import datetime
 from io import BytesIO
 
-import memcache
+from pymemcache.client import Client
 from paste.request import parse_formvars
 from matplotlib.patches import Polygon, Rectangle
 import matplotlib.colors as mpcolors
@@ -12,7 +12,7 @@ from pyiem.reference import EPSG
 from pyiem.plot.use_agg import plt
 from pyiem.plot.geoplot import MapPlot, Z_OVERLAY2
 from pyiem.plot.colormaps import james, dep_erosion
-from pyiem.util import get_dbconn
+from pyiem.util import get_sqlalchemy_conn, get_dbconn
 from pyiem.dep import RAMPS
 
 V2NAME = {
@@ -44,19 +44,19 @@ def make_overviewmap(form):
         huclimiter = ""
     elif len(huc) >= 8:
         huclimiter = " and substr(huc_12, 1, 8) = '%s' " % (huc[:8],)
-    pgconn = get_dbconn("idep")
-    df = read_postgis(
-        f"""
-        SELECT simple_geom as geom, huc_12,
-        ST_x(ST_Transform(ST_Centroid(geom), 4326)) as centroid_x,
-        ST_y(ST_Transform(ST_Centroid(geom), 4326)) as centroid_y,
-        hu_12_name
-        from huc12 i WHERE i.scenario = 0 {huclimiter}
-    """,
-        pgconn,
-        geom_col="geom",
-        index_col="huc_12",
-    )
+    with get_sqlalchemy_conn("idep") as conn:
+        df = read_postgis(
+            f"""
+            SELECT simple_geom as geom, huc_12,
+            ST_x(ST_Transform(ST_Centroid(geom), 4326)) as centroid_x,
+            ST_y(ST_Transform(ST_Centroid(geom), 4326)) as centroid_y,
+            hu_12_name
+            from huc12 i WHERE i.scenario = 0 {huclimiter}
+        """,
+            conn,
+            geom_col="geom",
+            index_col="huc_12",
+        )
     minx, miny, maxx, maxy = df["geom"].total_bounds
     buf = float(form.get("zoom", 10.0)) * 1000.0  # 10km
     hucname = "" if huc not in df.index else df.at[huc, "hu_12_name"]
@@ -192,53 +192,55 @@ def make_map(huc, ts, ts2, scenario, v, form):
     if "averaged" in form:
         # 11 years of data is standard
         # 10 years is for the switchgrass one-off
-        df = read_postgis(
-            f"""
-        WITH data as (
-        SELECT huc_12, sum({v}) / 10. as d from results_by_huc12
-        WHERE scenario = %s and to_char(valid, 'mmdd') between %s and %s
-        and valid between '2008-01-01' and '2018-01-01'
-        GROUP by huc_12)
+        with get_sqlalchemy_conn("idep") as conn:
+            df = read_postgis(
+                f"""
+            WITH data as (
+            SELECT huc_12, sum({v}) / 10. as d from results_by_huc12
+            WHERE scenario = %s and to_char(valid, 'mmdd') between %s and %s
+            and valid between '2008-01-01' and '2018-01-01'
+            GROUP by huc_12)
 
-        SELECT simple_geom as geom,
-        coalesce(d.d, 0) * %s as data
-        from huc12 i LEFT JOIN data d
-        ON (i.huc_12 = d.huc_12) WHERE i.scenario = %s {huclimiter}
-        """,
-            pgconn,
-            params=(
-                scenario,
-                ts.strftime("%m%d"),
-                ts2.strftime("%m%d"),
-                V2MULTI[v],
-                0,
-            ),
-            geom_col="geom",
-        )
+            SELECT simple_geom as geom,
+            coalesce(d.d, 0) * %s as data
+            from huc12 i LEFT JOIN data d
+            ON (i.huc_12 = d.huc_12) WHERE i.scenario = %s {huclimiter}
+            """,
+                conn,
+                params=(
+                    scenario,
+                    ts.strftime("%m%d"),
+                    ts2.strftime("%m%d"),
+                    V2MULTI[v],
+                    0,
+                ),
+                geom_col="geom",
+            )
 
     else:
-        df = read_postgis(
-            f"""
-        WITH data as (
-        SELECT huc_12, sum({v})  as d from results_by_huc12
-        WHERE scenario = %s and valid between %s and %s
-        GROUP by huc_12)
+        with get_sqlalchemy_conn("idep") as conn:
+            df = read_postgis(
+                f"""
+            WITH data as (
+            SELECT huc_12, sum({v})  as d from results_by_huc12
+            WHERE scenario = %s and valid between %s and %s
+            GROUP by huc_12)
 
-        SELECT simple_geom as geom,
-        coalesce(d.d, 0) * %s as data
-        from huc12 i LEFT JOIN data d
-        ON (i.huc_12 = d.huc_12) WHERE i.scenario = %s {huclimiter}
-        """,
-            pgconn,
-            params=(
-                scenario,
-                ts.strftime("%Y-%m-%d"),
-                ts2.strftime("%Y-%m-%d"),
-                V2MULTI[v],
-                0,
-            ),
-            geom_col="geom",
-        )
+            SELECT simple_geom as geom,
+            coalesce(d.d, 0) * %s as data
+            from huc12 i LEFT JOIN data d
+            ON (i.huc_12 = d.huc_12) WHERE i.scenario = %s {huclimiter}
+            """,
+                conn,
+                params=(
+                    scenario,
+                    ts.strftime("%Y-%m-%d"),
+                    ts2.strftime("%Y-%m-%d"),
+                    V2MULTI[v],
+                    0,
+                ),
+                geom_col="geom",
+            )
     minx, miny, maxx, maxy = df["geom"].total_bounds
     buf = 10000.0  # 10km
     m = MapPlot(
@@ -358,10 +360,9 @@ def main(environ):
     )
     if form.get("overview"):
         mckey = "/auto/map.py/%s/%s" % (huc, form.get("zoom"))
-    mc = memcache.Client(["iem-memcached:11211"], debug=0)
+    mc = Client(["iem-memcached", 11211])
     res = mc.get(mckey)
-    hostname = environ.get("SERVER_NAME", "")
-    if not res or hostname == "depbackend.local":
+    if res is None:
         # Lazy import to help speed things up
         if form.get("overview"):
             res, do_cache = make_overviewmap(form)
@@ -370,6 +371,7 @@ def main(environ):
         sys.stderr.write("Setting cache: %s\n" % (mckey,))
         if do_cache:
             mc.set(mckey, res, 3600)
+    mc.close()
     return res
 
 

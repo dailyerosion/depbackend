@@ -25,7 +25,7 @@ def make_plot(huc12, scenario):
 
     data = np.array(res)
     g = sns.jointplot(
-        data[:, 1], data[:, 0], s=40, stat_func=None, zorder=1, color="tan"
+        x=data[:, 1], y=data[:, 0], s=40, zorder=1, color="tan"
     ).plot_joint(sns.kdeplot, n_levels=6)
     g.ax_joint.set_xlabel("Slope Length [m]")
     g.ax_joint.set_ylabel("Bulk Slope [%]")
