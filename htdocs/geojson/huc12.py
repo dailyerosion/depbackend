@@ -118,7 +118,11 @@ def application(environ, start_response):
     res = mc.get(mckey)
     if res is None:
         res = do(ts, ts2, domain)
-        mc.set(mckey, res, 3600)
+        try:
+            # Unknown BrokenPipeError
+            mc.set(mckey, res, 3600)
+        except Exception as exp:
+            print(exp)
     else:
         res = res.decode("utf-8")
     mc.close()
