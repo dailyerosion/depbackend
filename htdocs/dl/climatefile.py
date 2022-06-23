@@ -13,7 +13,7 @@ def spiral(lon, lat):
     # points near the domain edge need to seach a bit further than 0.25deg
     X = 40
     Y = 40
-    for _ in range(40 ** 2):
+    for _ in range(40**2):
         if (-X / 2 < x <= X / 2) and (-Y / 2 < y <= Y / 2):
             newfn = get_cli_fname(lon + x * 0.01, lat + y * 0.01)
             if os.path.isfile(newfn):
@@ -34,6 +34,11 @@ def application(environ, start_response):
         headers = [("Content-type", "text/plain")]
         start_response("500 Internal Server Error", headers)
         return [b"API FAIL!"]
+    # 23 Jun 2022 restrict domain to decent data bounds
+    if lon < -104 or lon > -74 or lat < 35 or lat > 49:
+        headers = [("Content-type", "text/plain")]
+        start_response("500 Internal Server Error", headers)
+        return [b"Requested point outside of bounds -104,35 -74,49!"]
     fn = spiral(lon, lat)
     if fn is None:
         headers = [("Content-type", "text/plain")]
