@@ -11,7 +11,7 @@ def do():
         df = gpd.read_postgis(
             "SELECT ST_ReducePrecision(ST_Transform(simple_geom, 4326), "
             " 0.0001) as geo, dominant_tillage as dt, "
-            "huc_12 from huc12 WHERE scenario = 0",
+            "huc_12, hu_12_name as name from huc12 WHERE scenario = 0",
             conn,
             index_col="huc_12",
             geom_col="geo",
@@ -19,11 +19,11 @@ def do():
     return df.to_json()
 
 
-def application(environ, start_response):
+def application(_environ, start_response):
     """Do Fun things"""
     headers = [("Content-Type", "application/vnd.geo+json")]
     start_response("200 OK", headers)
-    mckey = "/geojson/huc12.geojson/v1"
+    mckey = "/geojson/huc12.geojson"
     mc = Client(["iem-memcached", 11211])
     res = mc.get(mckey)
     if res is None:

@@ -39,9 +39,7 @@ def make_plot(huc12, scenario):
     bars = ax.bar(months - 0.4, data, color="tan", yerr=confidence)
     ax.grid(True)
     ax.set_ylabel("Soil Detachment (t/a)")
-    ax.set_title(
-        ("Monthly Average Soil Detachment (t/a)\nHUC12: %s") % (huc12,)
-    )
+    ax.set_title(f"Monthly Average Soil Detachment (t/a)\nHUC12: {huc12}")
     ax.set_xticks(np.arange(1, 13))
     ax.set_xticklabels(calendar.month_abbr[1:])
     ax.set_xlim(0.5, 12.5)
@@ -54,7 +52,7 @@ def make_plot(huc12, scenario):
             ax.text(
                 rect.get_x() + rect.get_width() / 2.0,
                 1.05 * height,
-                "%.1f" % height,
+                f"{height:.1f}",
                 ha="center",
                 va="bottom",
             )
