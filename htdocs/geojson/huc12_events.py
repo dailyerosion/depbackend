@@ -73,7 +73,7 @@ def application(environ, start_response):
     huc12 = form.get("huc12", "000000000000")[:12]
     mode = form.get("mode", "daily")
 
-    mckey = "/geojson/huc12_events/%s/%s" % (huc12, mode)
+    mckey = f"/geojson/huc12_events/{huc12}/{mode}"
     mc = Client(["iem-memcached", 11211])
     res = mc.get(mckey)
     if res is None:
@@ -83,5 +83,5 @@ def application(environ, start_response):
         res = res.decode("utf-8")
     mc.close()
     if cb is not None:
-        res = "%s(%s)" % (cb, res)
+        res = f"{cb}({res})"
     return [res.encode("ascii")]

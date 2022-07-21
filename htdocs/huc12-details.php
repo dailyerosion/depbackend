@@ -1,6 +1,6 @@
 <?php 
 date_default_timezone_set('America/Chicago');
-$huc_12 = isset($_REQUEST['huc12'])? $_REQUEST['huc12']: die();
+$huc_12 = isset($_REQUEST['huc12'])? substr($_REQUEST['huc12'], 0, 12): die();
 $date = isset($_REQUEST['date'])? strtotime($_REQUEST['date']): die();
 $date2 = isset($_REQUEST['date2'])? strtotime($_REQUEST['date2']): null;
 $scenario = isset($_REQUEST["scenario"]) ? intval($_REQUEST["scenario"]): 0;
@@ -146,4 +146,3 @@ if (pg_num_rows($rs) == 0){
 	}
 	echo "</table>";
 }
-?>

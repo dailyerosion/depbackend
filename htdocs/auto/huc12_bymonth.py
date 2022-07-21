@@ -1,49 +1,54 @@
-"""Mapping Interface"""
+"""Monthly graphic available when viewing HUC12 summary."""
 from io import BytesIO
 import calendar
 
 import numpy as np
+import pandas as pd
 from paste.request import parse_formvars
-from pyiem.plot.use_agg import plt
-from pyiem.util import get_dbconn
+from pyiem.plot import figure
+from pyiem.util import get_sqlalchemy_conn
+
+TITLES = {
+    "qc_precip": "Precipitation (inch)",
+    "avg_runoff": "Water Runoff (inch)",
+    "avg_loss": "Soil Detachment (T/a)",
+    "avg_delivery": "Hillslope Soil Delivery (T/a)",
+}
 
 
 def make_plot(huc12, scenario):
     """Make the map"""
-    pgconn = get_dbconn("idep")
-    cursor = pgconn.cursor()
-
-    # Check that we have data for this date!
-    cursor.execute(
-        """
-        WITH data as (
+    with get_sqlalchemy_conn("idep") as conn:
+        df = pd.read_sql(
+            """
             SELECT extract(year from valid) as yr,
             extract(month from valid) as mo,
-            sum(avg_loss) * 4.463 as val from results_by_huc12
-            WHERE huc_12 = %s and scenario = %s GROUP by mo, yr)
-
-        SELECT mo, avg(val), stddev(val), count(*) from data
-        GROUP by mo ORDER by mo ASC
-    """,
-        (huc12, scenario),
+            sum(avg_loss) * 4.463 as avg_loss,
+            sum(avg_delivery) * 4.463 as avg_delivery,
+            sum(qc_precip) / 25.4 as qc_precip,
+            sum(avg_runoff) / 25.4 as avg_runoff
+            from results_by_huc12
+            WHERE huc_12 = %s and scenario = %s GROUP by mo, yr
+            """,
+            conn,
+            params=(huc12, scenario),
+            index_col=None,
+        )
+    gdf = df.groupby("mo").mean()
+    fig = figure(
+        logo="dep",
+        apctx={"_r": "43"},
+        title=(
+            f"Monthly Average for HUC12: {huc12} "
+            f"({df['yr'].min():.0f}-{df['yr'].max():.0f}) "
+        ),
     )
-    months = []
-    data = []
-    confidence = []
-    for row in cursor:
-        months.append(row[0])
-        data.append(row[1])
-        confidence.append(row[2] / (row[3] ** 2))
-    months = np.array(months)
-    (_, ax) = plt.subplots(1, 1)
-    bars = ax.bar(months - 0.4, data, color="tan", yerr=confidence)
-    ax.grid(True)
-    ax.set_ylabel("Soil Detachment (t/a)")
-    ax.set_title(f"Monthly Average Soil Detachment (t/a)\nHUC12: {huc12}")
-    ax.set_xticks(np.arange(1, 13))
-    ax.set_xticklabels(calendar.month_abbr[1:])
-    ax.set_xlim(0.5, 12.5)
-    ax.set_ylim(0, max(data) * 1.1)
+    boxes = [
+        [0.1, 0.5, 0.4, 0.35],
+        [0.6, 0.5, 0.37, 0.35],
+        [0.1, 0.05, 0.4, 0.35],
+        [0.6, 0.05, 0.37, 0.35],
+    ]
 
     def autolabel(rects):
         # attach some text labels
@@ -57,9 +62,27 @@ def make_plot(huc12, scenario):
                 va="bottom",
             )
 
-    autolabel(bars)
+    for i, varname in enumerate(TITLES):
+        ax = fig.add_axes(boxes[i])
+        bars = ax.bar(
+            gdf.index.values, gdf[varname].values, color="tan", align="center"
+        )
+        ax.grid(True)
+        ax.set_ylabel(TITLES[varname])
+        ax.set_xticks(np.arange(1, 13))
+        ax.set_xticklabels(calendar.month_abbr[1:])
+        ax.set_xlim(0.5, 12.5)
+        ax.set_ylim(0, gdf[varname].max() * 1.15)
+        ax.text(
+            0,
+            1.01,
+            f"Sum: {gdf[varname].sum():.02f}",
+            transform=ax.transAxes,
+        )
+
+        autolabel(bars)
     ram = BytesIO()
-    plt.savefig(ram, format="png", dpi=100)
+    fig.savefig(ram, format="png", dpi=100)
     ram.seek(0)
     return ram.read()
 
