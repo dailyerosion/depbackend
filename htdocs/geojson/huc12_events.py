@@ -58,6 +58,9 @@ def do(huc12, mode, fmt):
                 params=(huc12,),
                 index_col=None,
             )
+            df["valid"] = pd.to_datetime(
+                {"year": df["yr"], "month": 1, "day": 1}
+            )
     if fmt == "xlsx":
         bio = BytesIO()
         # pylint: disable=abstract-class-instantiated
@@ -72,12 +75,9 @@ def do(huc12, mode, fmt):
         "generation_time": utcnow.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     for _, row in df.iterrows():
-        dt = row[0]
-        if isinstance(row[0], int):
-            dt = datetime.date(int(row[0]), 1, 1)
         res["results"].append(
             dict(
-                date=dt.strftime("%Y-%m-%d"),
+                date=row["valid"].strftime("%Y-%m-%d"),
                 avg_loss=row["avg_loss"],
                 avg_loss_events=row["avg_loss_events"],
                 avg_delivery=row["avg_delivery"],
