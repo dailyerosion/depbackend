@@ -21,18 +21,21 @@ V2NAME = {
     "qc_precip": "Precipitation",
     "avg_delivery": "Hillslope Soil Loss",
     "avg_runoff": "Runoff",
+    "dt": "Dominant Tillage Code",
 }
 V2MULTI = {
     "avg_loss": 4.463,
     "qc_precip": 1.0 / 25.4,
     "avg_delivery": 4.463,
     "avg_runoff": 1.0 / 25.4,
+    "dt": 1,
 }
 V2UNITS = {
     "avg_loss": "tons/acre",
     "qc_precip": "inches",
     "avg_delivery": "tons/acre",
     "avg_runoff": "inches",
+    "dt": "categorical",
 }
 
 
@@ -143,7 +146,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
         # c = ['#ffffa6', '#9cf26d', '#76cc94', '#6399ba', '#5558a1']
         cmap = james()
     # suggested for detachment
-    elif v in ["avg_loss"]:
+    elif v in ["avg_loss", "dt"]:
         # c =['#cbe3bb', '#c4ff4d', '#ffff4d', '#ffc44d', '#ff4d4d', '#c34dee']
         cmap = dep_erosion()
     # suggested for delivery
@@ -201,7 +204,21 @@ def make_map(huc, ts, ts2, scenario, v, form):
         huclimiter += " and i.states ~* 'IA' "
     if "mn" in form:
         huclimiter += " and i.states ~* 'MN' "
-    if "averaged" in form:
+    if v == "dt":
+        with get_sqlalchemy_conn("idep") as conn:
+            df = gpd.read_postgis(
+                text(
+                    f"""
+            SELECT simple_geom as geom,
+            dominant_tillage as data
+            from huc12 i WHERE scenario = :scenario {huclimiter}
+            """
+                ),
+                conn,
+                params=params,
+                geom_col="geom",
+            )
+    elif "averaged" in form:
         # 11 years of data is standard
         # 10 years is for the switchgrass one-off
         with get_sqlalchemy_conn("idep") as conn:
@@ -266,6 +283,8 @@ def make_map(huc, ts, ts2, scenario, v, form):
         bins = RAMPS["english"][0]
     else:
         bins = RAMPS["english"][1]
+    if v == "dt":
+        bins = range(1, 8)
     norm = mpcolors.BoundaryNorm(bins, cmap.N)
     for _, row in df.iterrows():
         p = Polygon(
