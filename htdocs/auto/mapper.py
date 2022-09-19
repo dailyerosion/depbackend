@@ -7,7 +7,8 @@ from pymemcache.client import Client
 from paste.request import parse_formvars
 from matplotlib.patches import Polygon, Rectangle
 import matplotlib.colors as mpcolors
-from geopandas import read_postgis
+import geopandas as gpd
+from sqlalchemy import text
 from pyiem.reference import EPSG
 from pyiem.plot.use_agg import plt
 from pyiem.plot.geoplot import MapPlot, Z_OVERLAY2
@@ -40,21 +41,26 @@ def make_overviewmap(form):
     huc = form.get("huc")
     plt.close()
     projection = EPSG[5070]
+    params = {}
     if huc is None:
         huclimiter = ""
     elif len(huc) >= 8:
-        huclimiter = " and substr(huc_12, 1, 8) = '%s' " % (huc[:8],)
+        huclimiter = " and substr(huc_12, 1, 8) = :huc8 "
+        params["huc8"] = huc[:8]
     with get_sqlalchemy_conn("idep") as conn:
-        df = read_postgis(
-            f"""
+        df = gpd.read_postgis(
+            text(
+                f"""
             SELECT simple_geom as geom, huc_12,
             ST_x(ST_Transform(ST_Centroid(geom), 4326)) as centroid_x,
             ST_y(ST_Transform(ST_Centroid(geom), 4326)) as centroid_y,
             hu_12_name
             from huc12 i WHERE i.scenario = 0 {huclimiter}
-        """,
+        """
+            ),
             conn,
             geom_col="geom",
+            params=params,
             index_col="huc_12",
         )
     minx, miny, maxx, maxy = df["geom"].total_bounds
@@ -73,7 +79,7 @@ def make_overviewmap(form):
         east=maxx + buf,
         projection=projection,
         continentalcolor="white",
-        title="DEP HUC %s:: %s" % (huc, hucname),
+        title=f"DEP HUC {huc}:: {hucname}",
         subtitle=subtitle,
         titlefontsize=20,
         subtitlefontsize=18,
@@ -119,7 +125,7 @@ def label_scenario(ax, scenario, pgconn):
     ax.text(
         0.99,
         0.99,
-        "Scenario %s: %s" % (scenario, label),
+        f"Scenario {scenario}: {label}",
         transform=ax.transAxes,
         ha="right",
         va="top",
@@ -148,16 +154,12 @@ def make_map(huc, ts, ts2, scenario, v, form):
     pgconn = get_dbconn("idep")
     cursor = pgconn.cursor()
 
-    title = "for %s" % (ts.strftime("%-d %B %Y"),)
+    title = f"for {ts:%-d %B %Y}"
     if ts != ts2:
-        title = "for period between %s and %s" % (
-            ts.strftime("%-d %b %Y"),
-            ts2.strftime("%-d %b %Y"),
-        )
+        title = f"for period between {ts:%-d %b %Y} and {ts2:%-d %b %Y}"
         if "averaged" in form:
-            title = "averaged between %s and %s (2008-2017)" % (
-                ts.strftime("%-d %b"),
-                ts2.strftime("%-d %b"),
+            title = (
+                f"averaged between {ts:%-d %b} and {ts2:%-d %b} (2008-2017)"
             )
 
     # Check that we have data for this date!
@@ -179,12 +181,22 @@ def make_map(huc, ts, ts2, scenario, v, form):
         plt.close()
         ram.seek(0)
         return ram.read(), False
+    params = {
+        "scenario": scenario,
+        "sday1": f"{ts:%m%d}",
+        "sday2": f"{ts2:%m%d}",
+        "ts": ts,
+        "ts2": ts2,
+        "dbcol": V2MULTI[v],
+    }
     if huc is None:
         huclimiter = ""
     elif len(huc) == 8:
-        huclimiter = " and substr(i.huc_12, 1, 8) = '%s' " % (huc,)
+        huclimiter = " and substr(i.huc_12, 1, 8) = :huc8 "
+        params["huc8"] = huc
     elif len(huc) == 12:
-        huclimiter = " and i.huc_12 = '%s' " % (huc,)
+        huclimiter = " and i.huc_12 = :huc12 "
+        params["huc12"] = huc
     if "iowa" in form:
         huclimiter += " and i.states ~* 'IA' "
     if "mn" in form:
@@ -193,52 +205,45 @@ def make_map(huc, ts, ts2, scenario, v, form):
         # 11 years of data is standard
         # 10 years is for the switchgrass one-off
         with get_sqlalchemy_conn("idep") as conn:
-            df = read_postgis(
-                f"""
+            df = gpd.read_postgis(
+                text(
+                    f"""
             WITH data as (
             SELECT huc_12, sum({v}) / 10. as d from results_by_huc12
-            WHERE scenario = %s and to_char(valid, 'mmdd') between %s and %s
+            WHERE scenario = :scenario and to_char(valid, 'mmdd') between
+            :sday1 and :sday2
             and valid between '2008-01-01' and '2018-01-01'
             GROUP by huc_12)
 
             SELECT simple_geom as geom,
-            coalesce(d.d, 0) * %s as data
+            coalesce(d.d, 0) * :dbcol as data
             from huc12 i LEFT JOIN data d
-            ON (i.huc_12 = d.huc_12) WHERE i.scenario = %s {huclimiter}
-            """,
-                conn,
-                params=(
-                    scenario,
-                    ts.strftime("%m%d"),
-                    ts2.strftime("%m%d"),
-                    V2MULTI[v],
-                    0,
+            ON (i.huc_12 = d.huc_12) WHERE i.scenario = :scenario {huclimiter}
+            """
                 ),
+                conn,
+                params=params,
                 geom_col="geom",
             )
 
     else:
         with get_sqlalchemy_conn("idep") as conn:
-            df = read_postgis(
-                f"""
+            df = gpd.read_postgis(
+                text(
+                    f"""
             WITH data as (
             SELECT huc_12, sum({v})  as d from results_by_huc12
-            WHERE scenario = %s and valid between %s and %s
+            WHERE scenario = :scenario and valid between :ts and :ts2
             GROUP by huc_12)
 
             SELECT simple_geom as geom,
-            coalesce(d.d, 0) * %s as data
+            coalesce(d.d, 0) * :dbcol as data
             from huc12 i LEFT JOIN data d
-            ON (i.huc_12 = d.huc_12) WHERE i.scenario = %s {huclimiter}
-            """,
-                conn,
-                params=(
-                    scenario,
-                    ts.strftime("%Y-%m-%d"),
-                    ts2.strftime("%Y-%m-%d"),
-                    V2MULTI[v],
-                    0,
+            ON (i.huc_12 = d.huc_12) WHERE i.scenario = :scenario {huclimiter}
+            """
                 ),
+                conn,
+                params=params,
                 geom_col="geom",
             )
     minx, miny, maxx, maxy = df["geom"].total_bounds
@@ -252,7 +257,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
         west=minx - buf,
         east=maxx + buf,
         projection=projection,
-        title="DEP %s by HUC12 %s" % (V2NAME[v], title),
+        title=f"DEP {V2NAME[v]} by HUC12 {title}",
         titlefontsize=16,
         caption="Daily Erosion Project",
     )
@@ -284,11 +289,11 @@ def make_map(huc, ts, ts2, scenario, v, form):
     if "progressbar" in form:
         fig = plt.gcf()
         avgval = df["data"].mean()
+        _ll = ts.year if "averaged" not in form else "Avg"
         fig.text(
             0.01,
             0.905,
-            "%s: %4.1f T/a"
-            % (ts.year if "averaged" not in form else "Avg", avgval),
+            f"{_ll}: {avgval:4.1f} T/a",
             fontsize=14,
         )
         bar_width = 0.758
@@ -320,7 +325,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
         m.ax.text(
             0.9,
             0.92,
-            "%.2fmm" % (depth,),
+            f"{depth:.2f}mm",
             zorder=1000,
             fontsize=24,
             transform=m.ax.transAxes,
@@ -351,15 +356,9 @@ def main(environ):
 
     ts = datetime.date(int(year), int(month), int(day))
     ts2 = datetime.date(int(year2), int(month2), int(day2))
-    mckey = "/auto/map.py/%s/%s/%s/%s/%s" % (
-        huc,
-        ts.strftime("%Y%m%d"),
-        ts2.strftime("%Y%m%d"),
-        scenario,
-        v,
-    )
+    mckey = f"/auto/map.py/{huc}/{ts:%Y%m%d}/{ts2:%Y%m%d}/{scenario}/{v}"
     if form.get("overview"):
-        mckey = "/auto/map.py/%s/%s" % (huc, form.get("zoom"))
+        mckey = f"/auto/map.py/{huc}/{form.get('zoom')}"
     mc = Client(["iem-memcached", 11211])
     res = mc.get(mckey)
     if res is None:
@@ -368,7 +367,7 @@ def main(environ):
             res, do_cache = make_overviewmap(form)
         else:
             res, do_cache = make_map(huc, ts, ts2, scenario, v, form)
-        sys.stderr.write("Setting cache: %s\n" % (mckey,))
+        sys.stderr.write(f"Setting cache: {mckey}\n")
         if do_cache:
             mc.set(mckey, res, 3600)
     mc.close()
