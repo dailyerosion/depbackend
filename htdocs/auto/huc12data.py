@@ -75,7 +75,7 @@ def application(environ, start_response):
     ts2 = datetime.datetime.strptime(form.get("edate"), "%Y%m%d")
 
     mckey = f"/json/huc12data/{ts:%Y%m%d}_{ts2:%Y%m%d}/v2"
-    mc = Client(["iem-memcached", 11211])
+    mc = Client("iem-memcached:11211")
     res = mc.get(mckey)
     if res is None:
         res = do(ts, ts2)

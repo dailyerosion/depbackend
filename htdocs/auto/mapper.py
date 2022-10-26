@@ -378,7 +378,7 @@ def main(environ):
     mckey = f"/auto/map.py/{huc}/{ts:%Y%m%d}/{ts2:%Y%m%d}/{scenario}/{v}"
     if form.get("overview"):
         mckey = f"/auto/map.py/{huc}/{form.get('zoom')}"
-    mc = Client(["iem-memcached", 11211])
+    mc = Client("iem-memcached:11211")
     res = mc.get(mckey)
     if res is None:
         # Lazy import to help speed things up
