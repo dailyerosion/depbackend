@@ -114,7 +114,7 @@ def application(environ, start_response):
     tkey = "" if ts2 is None else ts2.strftime("%Y%m%d")
     dkey = "" if domain is None else domain
     mckey = f"/geojson/huc12/{ts:%Y%m%d}/{tkey}/{dkey}"
-    mc = Client(["iem-memcached", 11211])
+    mc = Client("iem-memcached:11211")
     res = mc.get(mckey)
     if res is None:
         res = do(ts, ts2, domain)

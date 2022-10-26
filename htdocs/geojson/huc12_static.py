@@ -24,7 +24,7 @@ def application(_environ, start_response):
     headers = [("Content-Type", "application/vnd.geo+json")]
     start_response("200 OK", headers)
     mckey = "/geojson/huc12.geojson"
-    mc = Client(["iem-memcached", 11211])
+    mc = Client("iem-memcached:11211")
     res = mc.get(mckey)
     if res is None:
         res = do()

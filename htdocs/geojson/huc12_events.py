@@ -109,7 +109,7 @@ def application(environ, start_response):
     start_response("200 OK", headers)
 
     mckey = f"/geojson/huc12_events/{huc12}/{mode}/{fmt}"
-    mc = Client(["iem-memcached", 11211])
+    mc = Client("iem-memcached:11211")
     res = mc.get(mckey)
     if res is None:
         res = do(huc12, mode, fmt)
