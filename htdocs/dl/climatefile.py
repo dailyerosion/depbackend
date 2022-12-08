@@ -43,13 +43,13 @@ def application(environ, start_response):
     if fn is None:
         headers = [("Content-type", "text/plain")]
         start_response("500 Internal Server Error", headers)
-        return [b"API FAIL!"]
+        return [b"Failed to locate a climate file in vicinity of your point."]
 
     headers = [
         ("Content-type", "application/octet-stream"),
         (
             "Content-Disposition",
-            "attachment; filename=%s" % (fn.split("/")[-1],),
+            f"attachment; filename={fn.split('/')[-1]}",
         ),
     ]
     start_response("200 OK", headers)
