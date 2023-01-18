@@ -8,11 +8,13 @@ from paste.request import parse_formvars
 from matplotlib.patches import Polygon, Rectangle
 import matplotlib.colors as mpcolors
 import geopandas as gpd
+import pandas as pd
 from sqlalchemy import text
 from pyiem.reference import EPSG
 from pyiem.plot.use_agg import plt
 from pyiem.plot.geoplot import MapPlot, Z_OVERLAY2
 from pyiem.plot.colormaps import james, dep_erosion
+from pyiem.plot.util import pretty_bins
 from pyiem.util import get_sqlalchemy_conn, get_dbconn
 from pyiem.dep import RAMPS
 
@@ -283,6 +285,11 @@ def make_map(huc, ts, ts2, scenario, v, form):
         bins = RAMPS["english"][0]
     else:
         bins = RAMPS["english"][1]
+    # Check if our ramp makes sense
+    p95 = df["data"].describe(percentiles=[0.95])["95%"]
+    if not pd.isna(p95) and p95 > bins[-1]:
+        bins = pretty_bins(0, p95)
+        bins[0] = 0.01
     if v == "dt":
         bins = range(1, 8)
     norm = mpcolors.BoundaryNorm(bins, cmap.N)
