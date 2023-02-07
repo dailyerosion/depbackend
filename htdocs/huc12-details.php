@@ -19,7 +19,7 @@ function timeit($db, $name, $sql){
 $rs = pg_prepare(
     $dbconn,
     "SELECT",
-    "SELECT hu_12_name from huc12 WHERE huc_12 = $1 and scenario = $2",
+    "SELECT name from huc12 WHERE huc_12 = $1 and scenario = $2",
 );
 $rs = timeit($dbconn, "SELECT", Array($huc_12, $scenario));
 if (pg_num_rows($rs) != 1){
@@ -27,7 +27,7 @@ if (pg_num_rows($rs) != 1){
 	die();
 }
 $row = pg_fetch_assoc($rs,0);
-$hu12name = $row["hu_12_name"];
+$hu12name = $row["name"];
 
 $nicedate = date("d M Y", $date);
 if ($date2 != null){

@@ -58,8 +58,7 @@ def make_overviewmap(form):
                 f"""
             SELECT simple_geom as geom, huc_12,
             ST_x(ST_Transform(ST_Centroid(geom), 4326)) as centroid_x,
-            ST_y(ST_Transform(ST_Centroid(geom), 4326)) as centroid_y,
-            hu_12_name
+            ST_y(ST_Transform(ST_Centroid(geom), 4326)) as centroid_y, name
             from huc12 i WHERE i.scenario = 0 {huclimiter}
         """
             ),
@@ -70,7 +69,7 @@ def make_overviewmap(form):
         )
     minx, miny, maxx, maxy = df["geom"].total_bounds
     buf = float(form.get("zoom", 10.0)) * 1000.0  # 10km
-    hucname = "" if huc not in df.index else df.at[huc, "hu_12_name"]
+    hucname = "" if huc not in df.index else df.at[huc, "name"]
     subtitle = "The HUC8 is in tan"
     if len(huc) == 12:
         subtitle = "HUC12 highlighted in red, the HUC8 it resides in is in tan"

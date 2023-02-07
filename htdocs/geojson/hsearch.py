@@ -11,8 +11,8 @@ def search(q):
     cursor = pgconn.cursor()
     d = dict(results=[])
     cursor.execute(
-        """SELECT huc_12, hu_12_name from huc12
-    WHERE hu_12_name ~* %s and scenario = 0 LIMIT 10""",
+        """SELECT huc_12, name from huc12
+    WHERE name ~* %s and scenario = 0 LIMIT 10""",
         (q,),
     )
     for row in cursor:

@@ -26,13 +26,11 @@ def workflow(start_response, dt, dt2, states):
             _s = [" states ~* '%s' " % (a,) for a in tokens]
             statelimit = " and (" + " or ".join(_s) + " ) "
     df = GeoDataFrame.from_postgis(
-        """
+        f"""
         WITH data as (
-            SELECT simple_geom, huc_12, hu_12_name
+            SELECT simple_geom, huc_12, name
             from huc12 WHERE scenario = 0
-            """
-        + statelimit
-        + """),
+            {statelimit}),
         obs as (
             SELECT huc_12,
             sum(coalesce(avg_loss, 0)) as avg_loss,
@@ -40,11 +38,9 @@ def workflow(start_response, dt, dt2, states):
             sum(coalesce(qc_precip, 0)) as qc_precip,
             sum(coalesce(avg_runoff, 0)) as avg_runoff
             from results_by_huc12 WHERE
-            """
-        + dextra
-        + """ and scenario = 0 GROUP by huc_12)
+            {dextra} and scenario = 0 GROUP by huc_12)
 
-        SELECT d.simple_geom, d.huc_12, d.hu_12_name as name,
+        SELECT d.simple_geom, d.huc_12, d.name,
         coalesce(o.qc_precip, 0) as prec_mm,
         coalesce(o.avg_loss, 0) as los_kgm2,
         coalesce(o.avg_runoff, 0) as runof_mm,
