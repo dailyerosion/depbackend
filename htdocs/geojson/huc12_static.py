@@ -11,7 +11,7 @@ def do():
         df = gpd.read_postgis(
             "SELECT ST_ReducePrecision(ST_Transform(simple_geom, 4326), "
             " 0.0001) as geo, dominant_tillage as dt, "
-            "huc_12, hu_12_name as name from huc12 WHERE scenario = 0",
+            "huc_12, name from huc12 WHERE scenario = 0",
             conn,
             index_col="huc_12",
             geom_col="geo",
