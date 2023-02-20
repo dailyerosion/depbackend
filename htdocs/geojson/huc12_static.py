@@ -9,9 +9,12 @@ def do():
     """Do work"""
     with get_sqlalchemy_conn("idep") as conn:
         df = gpd.read_postgis(
-            "SELECT ST_ReducePrecision(ST_Transform(simple_geom, 4326), "
-            " 0.0001) as geo, dominant_tillage as dt, "
-            "huc_12, name from huc12 WHERE scenario = 0",
+            """
+            SELECT ST_ReducePrecision(ST_Transform(simple_geom, 4326),
+            0.0001) as geo, dominant_tillage as dt,
+            round(average_slope_ratio::numeric, 3) as slp,
+            huc_12, name from huc12 WHERE scenario = 0
+            """,
             conn,
             index_col="huc_12",
             geom_col="geo",
