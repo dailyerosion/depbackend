@@ -1,14 +1,14 @@
 """JSON service for HUC12 data"""
 import datetime
 
-from pymemcache.client import Client
+import pandas as pd
 
 # needed for Decimal formatting to work
 import simplejson as json
-import pandas as pd
 from paste.request import parse_formvars
 from pyiem.dep import RAMPS
 from pyiem.util import get_sqlalchemy_conn, utc
+from pymemcache.client import Client
 
 
 def do(ts, ts2):

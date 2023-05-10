@@ -1,6 +1,6 @@
 """Monthly graphic available when viewing HUC12 summary."""
-from io import BytesIO
 import calendar
+from io import BytesIO
 
 import numpy as np
 import pandas as pd
