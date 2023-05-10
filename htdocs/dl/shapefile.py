@@ -8,8 +8,8 @@ import zipfile
 
 from geopandas import GeoDataFrame
 from paste.request import parse_formvars
-from sqlalchemy import text
 from pyiem.util import get_sqlalchemy_conn
+from sqlalchemy import text
 
 PRJFILE = "/opt/iem/data/gis/meta/5070.prj"
 

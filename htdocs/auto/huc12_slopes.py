@@ -1,13 +1,13 @@
 """Mapping Interface"""
-import os
 import glob
+import os
 from io import BytesIO
 
 import numpy as np
-from paste.request import parse_formvars
-from pyiem.plot.use_agg import plt
-from pyiem.dep import read_slp
 import seaborn as sns
+from paste.request import parse_formvars
+from pyiem.dep import read_slp
+from pyiem.plot.use_agg import plt
 
 
 def make_plot(huc12, scenario):

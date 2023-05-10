@@ -1,25 +1,25 @@
 """Generate a PDF Report for a given HUC12."""
-from io import BytesIO
-import datetime
 import calendar
+import datetime
+from io import BytesIO
 
+import pandas as pd
 import requests
 from metpy.units import units
 from paste.request import parse_formvars
-import pandas as pd
+from pyiem.util import get_dbconn, get_sqlalchemy_conn
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
 from reportlab.platypus import (
-    SimpleDocTemplate,
-    Paragraph,
-    Spacer,
     Image,
+    PageBreak,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
     Table,
     TableStyle,
-    PageBreak,
 )
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.units import inch
-from pyiem.util import get_sqlalchemy_conn, get_dbconn
 
 PAGE_WIDTH = letter[0]
 PAGE_HEIGHT = letter[1]

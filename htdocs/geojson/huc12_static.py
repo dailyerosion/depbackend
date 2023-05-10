@@ -1,8 +1,8 @@
 """Answer /geojson/huc12.geojson with static metadata."""
 
-from pymemcache.client import Client
 import geopandas as gpd
 from pyiem.util import get_sqlalchemy_conn
+from pymemcache.client import Client
 
 
 def do():

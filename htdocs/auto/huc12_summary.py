@@ -1,6 +1,6 @@
 """HUC12 Summary Info."""
-from io import StringIO
 from datetime import datetime
+from io import StringIO
 
 import pandas as pd
 from paste.request import parse_formvars

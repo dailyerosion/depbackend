@@ -1,12 +1,12 @@
 """GeoJSON service for HUC12 data"""
 import datetime
-from io import BytesIO
 import json
+from io import BytesIO
 
 import pandas as pd
-from pymemcache.client import Client
 from paste.request import parse_formvars
 from pyiem.util import get_sqlalchemy_conn
+from pymemcache.client import Client
 
 EXL = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 

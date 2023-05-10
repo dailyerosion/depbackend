@@ -1,6 +1,6 @@
 """Return the time domain that we have DEP data for, given this scenario"""
-import json
 import datetime
+import json
 
 from paste.request import parse_formvars
 from pyiem.util import get_dbconn

@@ -1,22 +1,22 @@
 """Mapping Interface."""
-import sys
 import datetime
+import sys
 from io import BytesIO
 
-from pymemcache.client import Client
-from paste.request import parse_formvars
-from matplotlib.patches import Polygon, Rectangle
-import matplotlib.colors as mpcolors
 import geopandas as gpd
+import matplotlib.colors as mpcolors
 import pandas as pd
-from sqlalchemy import text
-from pyiem.reference import EPSG
-from pyiem.plot.use_agg import plt
-from pyiem.plot.geoplot import MapPlot, Z_OVERLAY2
-from pyiem.plot.colormaps import james, dep_erosion
-from pyiem.plot.util import pretty_bins
-from pyiem.util import get_sqlalchemy_conn, get_dbconn
+from matplotlib.patches import Polygon, Rectangle
+from paste.request import parse_formvars
 from pyiem.dep import RAMPS
+from pyiem.plot.colormaps import dep_erosion, james
+from pyiem.plot.geoplot import Z_OVERLAY2, MapPlot
+from pyiem.plot.use_agg import plt
+from pyiem.plot.util import pretty_bins
+from pyiem.reference import EPSG
+from pyiem.util import get_dbconn, get_sqlalchemy_conn
+from pymemcache.client import Client
+from sqlalchemy import text
 
 V2NAME = {
     "avg_loss": "Detachment",

@@ -1,13 +1,12 @@
 """GeoJSON service for HUC12 data"""
 import datetime
 
-from pymemcache.client import Client
-
 # needed for Decimal formatting to work
 import simplejson as json
 from paste.request import parse_formvars
 from pyiem.dep import RAMPS
 from pyiem.util import get_dbconn
+from pymemcache.client import Client
 
 
 def do(ts, ts2, domain):
