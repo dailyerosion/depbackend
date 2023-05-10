@@ -31,9 +31,10 @@ def workflow(start_response, dt, dt2, states):
         df = GeoDataFrame.from_postgis(
             text(
                 f"""
-            WITH data as (
+            with data as (
                 SELECT simple_geom, huc_12, name, dominant_tillage,
-                average_slope_ratio from huc12 WHERE scenario = 0
+                average_slope_ratio, s.dep_version_label as version
+                from huc12 h, scenarios s WHERE h.scenario = 0 and s.id = 0
                 {statelimit}),
             obs as (
                 SELECT huc_12,
@@ -41,8 +42,8 @@ def workflow(start_response, dt, dt2, states):
                 sum(coalesce(avg_delivery, 0)) as avg_delivery,
                 sum(coalesce(qc_precip, 0)) as qc_precip,
                 sum(coalesce(avg_runoff, 0)) as avg_runoff
-                from results_by_huc12 WHERE
-                {dextra} and scenario = 0 GROUP by huc_12)
+                from results_by_huc12 WHERE {dextra} and scenario = 0
+                GROUP by huc_12)
 
             SELECT d.simple_geom as geo, d.huc_12, d.name,
             d.dominant_tillage as tillcode,
@@ -50,7 +51,8 @@ def workflow(start_response, dt, dt2, states):
             coalesce(o.qc_precip, 0) as prec_mm,
             coalesce(o.avg_loss, 0) as los_kgm2,
             coalesce(o.avg_runoff, 0) as runof_mm,
-            coalesce(o.avg_delivery, 0) as deli_kgm
+            coalesce(o.avg_delivery, 0) as deli_kgm,
+            d.version
             from data d LEFT JOIN obs o ON (d.huc_12 = o.huc_12)
         """
             ),

@@ -22,6 +22,9 @@ def do(ts, ts2, domain):
     domainextra = ""
     if domain is not None:
         domainextra = f" and states ~* '{domain[:2].upper()}'"
+    # Get version label
+    cursor.execute("SELECT dep_version_label from scenarios where id = 0")
+    dep_version_label = cursor.fetchone()[0]
     cursor.execute(
         f"""
         WITH data as (
@@ -48,6 +51,7 @@ def do(ts, ts2, domain):
     )
     res = {
         "type": "FeatureCollection",
+        "dep_version_label": dep_version_label,
         "date": ts.strftime("%Y-%m-%d"),
         "date2": None if ts2 is None else ts2.strftime("%Y-%m-%d"),
         "features": [],
