@@ -3,6 +3,7 @@ import os
 
 from paste.request import parse_formvars
 from pyiem.dep import get_cli_fname
+from pyiem.iemre import EAST, NORTH, SOUTH, WEST
 
 
 def spiral(lon, lat):
@@ -35,10 +36,13 @@ def application(environ, start_response):
         start_response("500 Internal Server Error", headers)
         return [b"API FAIL!"]
     # 23 Jun 2022 restrict domain to decent data bounds
-    if lon < -104 or lon > -74 or lat < 35 or lat > 49:
+    if lon < WEST or lon > EAST or lat < SOUTH or lat > NORTH:
         headers = [("Content-type", "text/plain")]
         start_response("500 Internal Server Error", headers)
-        return [b"Requested point outside of bounds -104,35 -74,49!"]
+        errmsg = (
+            f"Requested point outside of bounds {WEST},{SOUTH} {EAST},{NORTH}!"
+        )
+        return [errmsg.encode("ascii")]
     fn = spiral(lon, lat)
     if fn is None:
         headers = [("Content-type", "text/plain")]
