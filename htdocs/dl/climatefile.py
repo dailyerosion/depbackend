@@ -1,7 +1,10 @@
 """Service providing a WEPP climate file."""
 import os
+from io import StringIO
 
+import pandas as pd
 from paste.request import parse_formvars
+from pydep.io.wepp import read_cli
 from pyiem.dep import get_cli_fname
 from pyiem.iemre import EAST, NORTH, SOUTH, WEST
 
@@ -57,4 +60,19 @@ def application(environ, start_response):
         ),
     ]
     start_response("200 OK", headers)
-    return [open(fn, "rb").read()]
+    if form.get("intensity") is not None:
+        levels = [int(x) for x in form["intensity"].split(",")]
+        df = read_cli(fn, compute_intensity_over=levels)
+        df.index.name = "date"
+        df = df.loc[: pd.Timestamp("now")]
+        df = df[df["pcpn"] > 0]
+        sio = StringIO()
+        cols = [
+            "pcpn",
+        ] + [f"i{x}_mm" for x in levels]
+        df[cols].to_csv(sio, float_format="%.2f")
+        return [sio.getvalue().encode("ascii")]
+
+    with open(fn, "rb") as fh:
+        payload = fh.read()
+    return [payload]
