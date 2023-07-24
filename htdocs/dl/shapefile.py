@@ -73,9 +73,9 @@ def workflow(start_response, dt, dt2, states):
         zfn = f"{fn}.zip"
         with zipfile.ZipFile(zfn, "w", zipfile.ZIP_DEFLATED) as zfp:
             with open(PRJFILE, encoding="ascii") as fh:
-                zfp.writestr(f"{fn}.prj", fh.read())
+                zfp.writestr(f"{basefn}.prj", fh.read())
             for suffix in ["shp", "shx", "dbf", "csv"]:
-                zfp.write(f"{fn}.{suffix}")
+                zfp.write(f"{fn}.{suffix}", f"{basefn}.{suffix}")
 
         with open(zfn, "rb") as fh:
             res = fh.read()
