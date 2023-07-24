@@ -95,12 +95,12 @@ def generate_run_metadata(huc12):
 
     # Something about managements and crops
     rows = [["Year", "Corn", "Soybean", "Pasture", "Other"]]
-    for year in range(2016, 2019):
+    for year in range(2016, 2023):
         with get_sqlalchemy_conn("idep") as conn:
             df = pd.read_sql(
                 """
             select substr(landuse, %s, 1) as datum, count(*) from
-            flowpath_points p JOIN flowpaths f on (p.flowpath = f.fid)
+            flowpath_ofes o JOIN flowpaths f on (o.flowpath = f.fid)
             WHERE f.huc_12 = %s and f.scenario = 0 GROUP by datum
             """,
                 conn,
