@@ -2,7 +2,6 @@
 Called from DEP map application
 """
 import datetime
-import os
 import tempfile
 import zipfile
 
@@ -62,26 +61,27 @@ def workflow(start_response, dt, dt2, states):
         )
 
     with tempfile.TemporaryDirectory() as tempdir:
-        os.chdir(tempdir)
-        fn = f"idepv2_{dt:%Y%m%d}"
+        basefn = f"idepv2_{dt:%Y%m%d}"
         if dt2:
-            fn += dt2.strftime("_%Y%m%d")
+            basefn += dt2.strftime("_%Y%m%d")
+        fn = f"{tempdir}/{basefn}"
         df.columns = [
             s.upper() if s != "geo" else s for s in df.columns.values
         ]
         df.to_file(f"{fn}.shp")
         df.drop(columns="geo").to_csv(f"{fn}.csv", index=False)
-        with zipfile.ZipFile(fn + ".zip", "w", zipfile.ZIP_DEFLATED) as zfp:
+        zfn = f"{fn}.zip"
+        with zipfile.ZipFile(zfn, "w", zipfile.ZIP_DEFLATED) as zfp:
             with open(PRJFILE, encoding="ascii") as fh:
                 zfp.writestr(f"{fn}.prj", fh.read())
             for suffix in ["shp", "shx", "dbf", "csv"]:
                 zfp.write(f"{fn}.{suffix}")
 
-        with open(f"{fn}.zip", "rb") as fh:
+        with open(zfn, "rb") as fh:
             res = fh.read()
     headers = [
         ("Content-type", "application/octet-stream"),
-        ("Content-Disposition", f"attachment; filename={fn}.zip"),
+        ("Content-Disposition", f"attachment; filename={basefn}.zip"),
     ]
     start_response("200 OK", headers)
 
