@@ -31,6 +31,7 @@ def spiral(lon, lat):
 def application(environ, start_response):
     """Go Main Go."""
     form = parse_formvars(environ)
+    fmt = form.get("format", "wepp")
     try:
         lat = float(form.get("lat"))
         lon = float(form.get("lon"))
@@ -73,6 +74,16 @@ def application(environ, start_response):
         df[cols].to_csv(sio, float_format="%.2f")
         return [sio.getvalue().encode("ascii")]
 
-    with open(fn, "rb") as fh:
-        payload = fh.read()
+    if fmt == "wepp":
+        with open(fn, "rb") as fh:
+            payload = fh.read()
+    elif fmt == "ntt":
+        df = read_cli(fn)
+        payload = StringIO()
+        for dt, row in df.iterrows():
+            payload.write(
+                f"  {dt.strftime('%Y %-2m %-2d')}  {row['rad']:3.0f}"
+                f"{row['tmax']:5.1f} {row['tmin']:5.1f} {row['pcpn']:6.2f}\n"
+            )
+        payload = payload.getvalue().encode("ascii")
     return [payload]
