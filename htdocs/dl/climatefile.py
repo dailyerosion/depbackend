@@ -53,12 +53,12 @@ def application(environ, start_response):
         start_response("500 Internal Server Error", headers)
         return [b"Failed to locate a climate file in vicinity of your point."]
 
+    dlfn = os.path.basename(fn)
+    if fmt == "ntt":
+        dlfn = dlfn.replace(".cli", ".txt")
     headers = [
         ("Content-type", "application/octet-stream"),
-        (
-            "Content-Disposition",
-            f"attachment; filename={fn.split('/')[-1]}",
-        ),
+        ("Content-Disposition", f"attachment; filename={dlfn}"),
     ]
     start_response("200 OK", headers)
     if form.get("intensity") is not None:
@@ -80,6 +80,8 @@ def application(environ, start_response):
     elif fmt == "ntt":
         df = read_cli(fn)
         payload = StringIO()
+        # Convert langleys to MJ
+        df["rad"] = df["rad"] * 0.04184
         for dt, row in df.iterrows():
             payload.write(
                 f"  {dt.strftime('%Y %-2m %-2d')}  {row['rad']:3.0f}"
