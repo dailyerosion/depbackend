@@ -55,7 +55,7 @@ def application(environ, start_response):
 
     dlfn = os.path.basename(fn)
     if fmt == "ntt":
-        dlfn = dlfn.replace(".cli", ".txt")
+        dlfn = dlfn[:-4].replace(".", "_") + ".wth"
     headers = [
         ("Content-type", "application/octet-stream"),
         ("Content-Disposition", f"attachment; filename={dlfn}"),
@@ -85,7 +85,8 @@ def application(environ, start_response):
         for dt, row in df.iterrows():
             payload.write(
                 f"  {dt.strftime('%Y %-2m %-2d')}  {row['rad']:3.0f}"
-                f"{row['tmax']:5.1f} {row['tmin']:5.1f} {row['pcpn']:6.2f}\n"
+                f"{row['tmax']:6.1f} {row['tmin']:6.1f} {row['pcpn']:6.2f}"
+                "\r\n"
             )
         payload = payload.getvalue().encode("ascii")
     return [payload]
