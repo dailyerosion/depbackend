@@ -72,6 +72,7 @@ def do(ts, ts2, domain):
                 type="Feature",
                 id=row[1],
                 properties=dict(
+                    huc_12=row[1],
                     avg_loss=row[2],
                     qc_precip=row[3],
                     avg_delivery=row[4],
