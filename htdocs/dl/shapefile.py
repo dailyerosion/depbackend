@@ -13,7 +13,7 @@ from sqlalchemy import text
 PRJFILE = "/opt/iem/data/gis/meta/5070.prj"
 
 
-def workflow(start_response, dt, dt2, states):
+def workflow(start_response, dt, dt2, states, conv):
     """Generate for a given date"""
     dextra = "valid = :dt"
     params = {"dt": dt}
@@ -59,6 +59,12 @@ def workflow(start_response, dt, dt2, states):
             params=params,
             geom_col="geo",
         )
+    if conv == "english":
+        df["prec_in"] = df["prec_mm"] / 25.4
+        df["loss_tpa"] = df["los_kgm2"] * 4.463
+        df["runof_in"] = df["runof_mm"] / 25.4
+        df["deli_tpa"] = df["deli_kgm"] * 4.463
+        df = df.drop(columns=["prec_mm", "los_kgm2", "runof_mm", "deli_kgm"])
 
     with tempfile.TemporaryDirectory() as tempdir:
         basefn = f"idepv2_{dt:%Y%m%d}"
@@ -94,6 +100,7 @@ def application(environ, start_response):
     dt = datetime.datetime.strptime(form.get("dt", "2019-12-11"), "%Y-%m-%d")
     dt2 = form.get("dt2")
     states = form.get("states")
+    conv = form.get("conv", "metric")
     if dt2 is not None:
         dt2 = datetime.datetime.strptime(form.get("dt2"), "%Y-%m-%d")
-    return [workflow(start_response, dt, dt2, states)]
+    return [workflow(start_response, dt, dt2, states, conv)]
