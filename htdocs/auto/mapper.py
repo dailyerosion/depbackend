@@ -163,7 +163,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
         title = f"for period between {ts:%-d %b %Y} and {ts2:%-d %b %Y}"
         if "averaged" in form:
             title = (
-                f"averaged between {ts:%-d %b} and {ts2:%-d %b} (2008-2017)"
+                f"averaged between {ts:%-d %b} and {ts2:%-d %b} (2008-2023)"
             )
 
     # Check that we have data for this date!
@@ -220,8 +220,6 @@ def make_map(huc, ts, ts2, scenario, v, form):
                 geom_col="geom",
             )
     elif "averaged" in form:
-        # 11 years of data is standard
-        # 10 years is for the switchgrass one-off
         with get_sqlalchemy_conn("idep") as conn:
             df = gpd.read_postgis(
                 text(
@@ -230,7 +228,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
             SELECT huc_12, sum({v}) / 10. as d from results_by_huc12
             WHERE scenario = :scenario and to_char(valid, 'mmdd') between
             :sday1 and :sday2
-            and valid between '2008-01-01' and '2018-01-01'
+            and valid between '2008-01-01' and '2024-01-01'
             GROUP by huc_12)
 
             SELECT simple_geom as geom,
@@ -266,7 +264,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
             )
     minx, miny, maxx, maxy = df["geom"].total_bounds
     buf = 10000.0  # 10km
-    m = MapPlot(
+    mp = MapPlot(
         axisbg="#EEEEEE",
         logo="dep",
         sector="custom",
@@ -292,7 +290,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
     if v == "dt":
         bins = range(1, 8)
     norm = mpcolors.BoundaryNorm(bins, cmap.N)
-    for _, row in df.iterrows():
+    for _, row in df.to_crs(mp.panels[0].crs).iterrows():
         p = Polygon(
             row["geom"].exterior.coords,
             fc=cmap(norm([row["data"]]))[0],
@@ -300,15 +298,15 @@ def make_map(huc, ts, ts2, scenario, v, form):
             zorder=5,
             lw=0.1,
         )
-        m.ax.add_patch(p)
+        mp.ax.add_patch(p)
 
-    label_scenario(m.ax, scenario, pgconn)
+    label_scenario(mp.ax, scenario, pgconn)
 
     lbl = [round(_, 2) for _ in bins]
     if huc is not None:
-        m.drawcounties()
-        m.drawcities()
-    m.draw_colorbar(
+        mp.drawcounties()
+        mp.drawcities()
+    mp.draw_colorbar(
         bins, cmap, norm, units=V2UNITS[v], clevlabels=lbl, spacing="uniform"
     )
     if "progressbar" in form:
@@ -347,13 +345,13 @@ def make_map(huc, ts, ts2, scenario, v, form):
     if "cruse" in form:
         # Crude conversion of T/a to mm depth
         depth = avgval / 5.0
-        m.ax.text(
+        mp.ax.text(
             0.9,
             0.92,
             f"{depth:.2f}mm",
             zorder=1000,
             fontsize=24,
-            transform=m.ax.transAxes,
+            transform=mp.ax.transAxes,
             ha="center",
             va="center",
             bbox=dict(color="k", alpha=0.5, boxstyle="round,pad=0.1"),
