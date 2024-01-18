@@ -165,6 +165,11 @@ def make_map(huc, ts, ts2, scenario, v, form):
             title = (
                 f"averaged between {ts:%-d %b} and {ts2:%-d %b} (2008-2023)"
             )
+    # Compute what the huc12 scenario is for this scenario
+    cursor.execute(
+        "select huc12_scenario from scenarios where id = %s", (scenario,)
+    )
+    huc12_scenario = cursor.fetchone()[0]
 
     # Check that we have data for this date!
     cursor.execute(
@@ -187,6 +192,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
         return ram.read(), False
     params = {
         "scenario": scenario,
+        "huc12_scenario": huc12_scenario,
         "sday1": f"{ts:%m%d}",
         "sday2": f"{ts2:%m%d}",
         "ts": ts,
@@ -212,7 +218,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
                     f"""
             SELECT simple_geom as geom,
             dominant_tillage as data
-            from huc12 i WHERE scenario = :scenario {huclimiter}
+            from huc12 i WHERE scenario = :huc12_scenario {huclimiter}
             """
                 ),
                 conn,
@@ -234,7 +240,8 @@ def make_map(huc, ts, ts2, scenario, v, form):
             SELECT simple_geom as geom,
             coalesce(d.d, 0) * :dbcol as data
             from huc12 i LEFT JOIN data d
-            ON (i.huc_12 = d.huc_12) WHERE i.scenario = :scenario {huclimiter}
+            ON (i.huc_12 = d.huc_12) WHERE i.scenario = :huc12_scenario
+            {huclimiter}
             """
                 ),
                 conn,
@@ -255,7 +262,8 @@ def make_map(huc, ts, ts2, scenario, v, form):
             SELECT simple_geom as geom,
             coalesce(d.d, 0) * :dbcol as data
             from huc12 i LEFT JOIN data d
-            ON (i.huc_12 = d.huc_12) WHERE i.scenario = :scenario {huclimiter}
+            ON (i.huc_12 = d.huc_12) WHERE i.scenario = :huc12_scenario
+            {huclimiter}
             """
                 ),
                 conn,
@@ -361,6 +369,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
     plt.savefig(ram, format="png", dpi=100)
     plt.close()
     ram.seek(0)
+    pgconn.close()
     return ram.read(), True
 
 

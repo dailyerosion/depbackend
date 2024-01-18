@@ -18,7 +18,10 @@ jobs:
 
     - name: Setup CI from ci-tooling
       run: |
+        set -e
         git clone --depth 1 https://github.com/akrherz/iem-database.git database
         git clone --depth 1 https://github.com/akrherz/ci_tooling.git .ci_tooling
-        . .ci_tooling/postgres.sh
-        . .ci_tooling/iemwebfarm.sh
+        cd .ci_tooling
+        . postgres.sh
+        . iemwebfarm.sh
+        cd ..
