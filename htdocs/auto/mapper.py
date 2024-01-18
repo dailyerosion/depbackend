@@ -163,7 +163,8 @@ def make_map(huc, ts, ts2, scenario, v, form):
         title = f"for period between {ts:%-d %b %Y} and {ts2:%-d %b %Y}"
         if "averaged" in form:
             title = (
-                f"averaged between {ts:%-d %b} and {ts2:%-d %b} (2008-2023)"
+                f"averaged between {ts:%-d %b} and {ts2:%-d %b} "
+                f"({ts:%Y}-{ts2:%Y})"
             )
     # Compute what the huc12 scenario is for this scenario
     cursor.execute(
@@ -234,7 +235,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
             SELECT huc_12, sum({v}) / 10. as d from results_by_huc12
             WHERE scenario = :scenario and to_char(valid, 'mmdd') between
             :sday1 and :sday2
-            and valid between '2008-01-01' and '2024-01-01'
+            and valid between :ts and :ts2
             GROUP by huc_12)
 
             SELECT simple_geom as geom,
