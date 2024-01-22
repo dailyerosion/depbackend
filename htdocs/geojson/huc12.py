@@ -5,8 +5,10 @@ import datetime
 import simplejson as json
 from paste.request import parse_formvars
 from pyiem.dep import RAMPS
-from pyiem.util import get_dbconn
+from pyiem.util import get_dbconn, logger
 from pymemcache.client import Client
+
+LOG = logger()
 
 
 def do(ts, ts2, domain):
@@ -126,7 +128,7 @@ def application(environ, start_response):
             # Unknown BrokenPipeError
             mc.set(mckey, res, 3600)
         except Exception as exp:
-            print(exp)
+            LOG.exception(exp)
     else:
         res = res.decode("utf-8")
     mc.close()
