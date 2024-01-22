@@ -18,12 +18,10 @@ def make_plot(huc12, scenario):
         try:
             slp = read_slp(fn)
         except Exception:
-            print(f"read_slp failed for {fn}")
             continue
         bulk = (slp[-1]["y"][-1]) / slp[-1]["x"][-1]
         length = slp[-1]["x"][-1]
         if bulk < -1:
-            print("Greater than 100%% slope, %s %s" % (fn, bulk))
             continue
         res.append([(0 - bulk) * 100.0, length])
 
