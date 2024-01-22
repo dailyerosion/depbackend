@@ -159,13 +159,18 @@ def make_map(huc, ts, ts2, scenario, v, form):
     cursor = pgconn.cursor()
 
     title = f"for {ts:%-d %B %Y}"
+    aextra = ""
     if ts != ts2:
         title = f"for period between {ts:%-d %b %Y} and {ts2:%-d %b %Y}"
         if "averaged" in form:
-            title = (
-                f"averaged between {ts:%-d %b} and {ts2:%-d %b} "
-                f"({ts:%Y}-{ts2:%Y})"
-            )
+            aextra = "/yr"
+            if f"{ts:%m%d}" == "0101" and f"{ts2:%m%d}" == "1231":
+                title = f"averaged over inclusive years ({ts:%Y}-{ts2:%Y})"
+            else:
+                title = (
+                    f"averaged between {ts:%-d %b} and {ts2:%-d %b} "
+                    f"({ts:%Y}-{ts2:%Y})"
+                )
     # Compute what the huc12 scenario is for this scenario
     cursor.execute(
         "select huc12_scenario from scenarios where id = %s", (scenario,)
@@ -316,7 +321,12 @@ def make_map(huc, ts, ts2, scenario, v, form):
         mp.drawcounties()
         mp.drawcities()
     mp.draw_colorbar(
-        bins, cmap, norm, units=V2UNITS[v], clevlabels=lbl, spacing="uniform"
+        bins,
+        cmap,
+        norm,
+        units=V2UNITS[v] + aextra,
+        clevlabels=lbl,
+        spacing="uniform",
     )
     if "progressbar" in form:
         fig = plt.gcf()
