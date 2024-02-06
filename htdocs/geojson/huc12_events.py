@@ -65,7 +65,7 @@ def do(huc12, mode, fmt):
         bio = BytesIO()
         # pylint: disable=abstract-class-instantiated
         writer = pd.ExcelWriter(bio, engine="xlsxwriter")
-        df.to_excel(writer, f"{huc12} Data", index=False)
+        df.to_excel(writer, sheet_name=f"{huc12} Data", index=False)
         writer.close()
         return bio.getvalue()
 
