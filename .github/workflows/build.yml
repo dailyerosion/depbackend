@@ -1,9 +1,19 @@
 name: Install and Test
-on: [push, pull_request]
+on:
+    pull_request:
+      branches:
+        - main
+    push:
+      branches:
+        - main
 jobs:
   build-linux:
     name: Python (${{ matrix.PYTHON_VERSION }})
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Ensures environment gets sourced right
+        shell: bash -l {0}  
     strategy:
       matrix:
         PYTHON_VERSION: ["3.12"]
@@ -16,6 +26,20 @@ jobs:
       run: |
         cat .github/workflows/etchosts.txt | sudo tee -a /etc/hosts
 
+    # setup conda-forge with micromamba
+    - name: Setup Python
+      uses: mamba-org/setup-micromamba@v1
+      with:
+        environment-file: environment.yml
+        condarc: |
+          channels:
+            - conda-forge
+            - defaults
+        create-args: >-
+          python=${{ env.PYTHON_VERSION }}
+        environment-name: prod
+        cache-environment: true
+
     - name: Setup CI from ci-tooling
       run: |
         set -e
@@ -24,4 +48,8 @@ jobs:
         cd .ci_tooling
         . postgres.sh
         . iemwebfarm.sh
-        cd ..
+
+    - name: Run Website Request Tests
+      run: |
+        set -e
+        python -m pytest -v tests/test_website_requests.py
