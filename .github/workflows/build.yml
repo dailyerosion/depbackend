@@ -56,6 +56,8 @@ jobs:
         sudo cp config/apache-vhost-ci.conf /etc/apache2/sites-available/depbackend.conf
         sudo systemctl restart apache2
 
+    - name: Debug with SSH
+      uses: lhotari/action-upterm@v1
     - name: Run Website Request Tests
       run: |
         set -e
