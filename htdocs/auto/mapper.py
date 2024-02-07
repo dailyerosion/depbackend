@@ -8,13 +8,13 @@ import matplotlib.colors as mpcolors
 import pandas as pd
 from matplotlib.patches import Polygon, Rectangle
 from paste.request import parse_formvars
+from pyiem.database import get_dbconn, get_sqlalchemy_conn
 from pyiem.dep import RAMPS
 from pyiem.plot.colormaps import dep_erosion, james
 from pyiem.plot.geoplot import Z_OVERLAY2, MapPlot
 from pyiem.plot.use_agg import plt
 from pyiem.plot.util import pretty_bins
 from pyiem.reference import EPSG
-from pyiem.util import get_dbconn, get_sqlalchemy_conn
 from pymemcache.client import Client
 from sqlalchemy import text
 
@@ -181,7 +181,10 @@ def make_map(huc, ts, ts2, scenario, v, form):
     cursor.execute(
         "SELECT value from properties where key = 'last_date_0'",
     )
-    lastts = datetime.datetime.strptime(cursor.fetchone()[0], "%Y-%m-%d")
+    if cursor.rowcount == 0:
+        lastts = datetime.date(2007, 1, 1)
+    else:
+        lastts = datetime.datetime.strptime(cursor.fetchone()[0], "%Y-%m-%d")
     floor = datetime.date(2007, 1, 1)
     if ts > lastts.date() or ts2 > lastts.date() or ts < floor:
         plt.text(
