@@ -49,7 +49,25 @@ jobs:
         . postgres.sh
         . iemwebfarm.sh
 
+    - name: Configure Apache
+      run: |
+        set -e
+        sudo ln -s `pwd` /opt/depbackend
+        sudo cp config/apache-vhost-ci.conf /etc/apache2/sites-available/depbackend.conf
+        sudo systemctl restart apache2
+
     - name: Run Website Request Tests
       run: |
         set -e
         python -m pytest -v tests/test_website_requests.py
+
+    - name: View Apache Logs
+      if: failure()
+      run: |
+        sudo systemctl status apache2 -l
+        sudo cat /var/log/apache2/error.log
+  
+    - name: View PHP-FPM Logs
+      if: failure()
+      run: |
+        sudo cat /var/log/php*-fpm.log
