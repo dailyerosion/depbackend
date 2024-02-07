@@ -1,9 +1,19 @@
 name: Install and Test
-on: [push, pull_request]
+on:
+    pull_request:
+      branches:
+        - main
+    push:
+      branches:
+        - main
 jobs:
   build-linux:
     name: Python (${{ matrix.PYTHON_VERSION }})
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Ensures environment gets sourced right
+        shell: bash -l {0}  
     strategy:
       matrix:
         PYTHON_VERSION: ["3.12"]
@@ -16,7 +26,21 @@ jobs:
       run: |
         cat .github/workflows/etchosts.txt | sudo tee -a /etc/hosts
 
-    - name: Setup CI from ci-tooling
+    # setup conda-forge with micromamba
+    - name: Setup Python
+      uses: mamba-org/setup-micromamba@v1
+      with:
+        environment-file: environment.yml
+        condarc: |
+          channels:
+            - conda-forge
+            - defaults
+        create-args: >-
+          python=${{ env.PYTHON_VERSION }}
+        environment-name: prod
+        cache-environment: true
+
+    - name: Setup IEMFarm Environment
       run: |
         set -e
         git clone --depth 1 https://github.com/akrherz/iem-database.git database
@@ -25,3 +49,37 @@ jobs:
         . postgres.sh
         . iemwebfarm.sh
         cd ..
+        cd database; sh bootstrap.sh
+        python schema_manager.py
+
+    # Get memcached running
+    - name: Setup Memcached
+      run: |
+        set -e
+        cd .ci_tooling
+        . memcached.sh
+
+    - name: Configure Apache
+      run: |
+        set -e
+        sudo ln -s `pwd` /opt/depbackend
+        sudo cp config/apache-vhost-ci.conf /etc/apache2/sites-enabled/depbackend.conf
+        sudo systemctl restart apache2
+
+    #- name: Debug with SSH
+    #  uses: lhotari/action-upterm@v1
+    - name: Run Website Request Tests
+      run: |
+        set -e
+        python -m pytest -v tests/test_website_requests.py
+
+    - name: View Apache Logs
+      if: failure()
+      run: |
+        sudo systemctl status apache2 -l
+        sudo cat /var/log/apache2/error.log
+  
+    - name: View PHP-FPM Logs
+      if: failure()
+      run: |
+        sudo cat /var/log/php*-fpm.log

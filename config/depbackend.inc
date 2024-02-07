@@ -20,8 +20,9 @@ Include /opt/iemwebfarm/config/vhost_common.conf
   </Directory>
 
   <Directory "/opt/depbackend/htdocs">
-    Options Indexes MultiViews FollowSymLinks
-    AllowOverride All
+    Options Indexes FollowSymLinks
+    AllowOverride None
+    Require all granted
 
     WSGIProcessGroup iemwsgi_ap
     AddHandler wsgi-script .py

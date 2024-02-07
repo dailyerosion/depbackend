@@ -1,4 +1,5 @@
 127.0.0.1 iem.local
+127.0.0.1 depbackend.local
 127.0.0.1 iemdb.local
 127.0.0.1 iemdb-hads.local
 127.0.0.1 iemdb-mos.local
