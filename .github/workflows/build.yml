@@ -40,7 +40,7 @@ jobs:
         environment-name: prod
         cache-environment: true
 
-    - name: Setup CI from ci-tooling
+    - name: Setup IEMFarm Environment
       run: |
         set -e
         git clone --depth 1 https://github.com/akrherz/iem-database.git database
@@ -48,6 +48,16 @@ jobs:
         cd .ci_tooling
         . postgres.sh
         . iemwebfarm.sh
+        cd ..
+        cd database; sh bootstrap.sh
+        python schema_manager.py
+
+    # Get memcached running
+    - name: Setup Memcached
+      run: |
+        set -e
+        cd .ci_tooling
+        . memcached.sh
 
     - name: Configure Apache
       run: |
