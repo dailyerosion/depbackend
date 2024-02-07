@@ -182,7 +182,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
         "SELECT value from properties where key = 'last_date_0'",
     )
     if cursor.rowcount == 0:
-        lastts = datetime.date(2007, 1, 1)
+        lastts = datetime.datetime(2007, 1, 1)
     else:
         lastts = datetime.datetime.strptime(cursor.fetchone()[0], "%Y-%m-%d")
     floor = datetime.date(2007, 1, 1)
