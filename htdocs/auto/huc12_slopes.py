@@ -1,4 +1,5 @@
 """Mapping Interface"""
+
 import glob
 import os
 from io import BytesIO

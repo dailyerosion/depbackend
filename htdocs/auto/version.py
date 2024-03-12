@@ -1,4 +1,5 @@
 """Simple JSON of DEP metadata versioning."""
+
 from io import StringIO
 
 import pandas as pd

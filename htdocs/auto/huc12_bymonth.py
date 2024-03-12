@@ -1,4 +1,5 @@
 """Monthly graphic available when viewing HUC12 summary."""
+
 import calendar
 from io import BytesIO
 

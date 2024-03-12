@@ -1,4 +1,5 @@
 """Return the time domain that we have DEP data for, given this scenario"""
+
 import datetime
 import json
 

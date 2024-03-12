@@ -1,4 +1,5 @@
 """Make website requests."""
+
 import os
 
 import pytest
