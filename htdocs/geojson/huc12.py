@@ -1,4 +1,5 @@
 """GeoJSON service for HUC12 data"""
+
 import datetime
 
 # needed for Decimal formatting to work

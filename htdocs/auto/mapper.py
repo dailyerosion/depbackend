@@ -1,4 +1,5 @@
 """Mapping Interface."""
+
 import datetime
 import sys
 from io import BytesIO
