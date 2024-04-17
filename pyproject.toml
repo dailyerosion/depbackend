@@ -1,6 +1,13 @@
 
 [tool.ruff]
 line-length = 79
-lint.select = ["E", "F", "I", "T"]
 target-version = "py39"
 
+[tool.ruff.lint]
+select = [
+    "B",  # bugbear
+    "E",
+    "F",
+    "I",
+    "T",
+]
