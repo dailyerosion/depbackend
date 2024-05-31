@@ -6,24 +6,39 @@ import pandas as pd
 
 # needed for Decimal formatting to work
 import simplejson as json
-from paste.request import parse_formvars
+from pydantic import Field
+from pyiem.database import get_sqlalchemy_conn
 from pyiem.dep import RAMPS
-from pyiem.util import get_sqlalchemy_conn, utc
-from pymemcache.client import Client
+from pyiem.util import utc
+from pyiem.webutil import CGIModel, iemapp
+from sqlalchemy import text
+
+
+class Schema(CGIModel):
+    """See how we are called."""
+
+    sdate: datetime.date = Field(
+        default=datetime.date(2010, 1, 1),
+        description="Start Date",
+    )
+    edate: datetime.date = Field(
+        default=datetime.date(2010, 1, 1),
+        description="End Date",
+    )
 
 
 def do(ts, ts2):
     """Do work"""
     with get_sqlalchemy_conn("idep") as conn:
         df = pd.read_sql(
-            """
+            text("""
         with data as (
             SELECT huc_12,
             sum(coalesce(avg_loss, 0)) * 4.463 as avg_loss,
             sum(coalesce(avg_delivery, 0)) * 4.463 as avg_delivery,
             sum(coalesce(qc_precip, 0)) / 25.4 as qc_precip,
             sum(coalesce(avg_runoff, 0)) / 25.4 as avg_runoff
-            from results_by_huc12 WHERE valid >= %s and valid <= %s
+            from results_by_huc12 WHERE valid >= :sdate and valid <= :edate
             and scenario = 0 GROUP by huc_12)
 
         SELECT h.huc_12,
@@ -33,9 +48,9 @@ def do(ts, ts2):
         coalesce(round(d.avg_runoff::numeric, 2), 0) as avg_runoff
         from huc12 h LEFT JOIN data d ON (h.huc_12 = d.huc_12) WHERE
         h.scenario = 0
-        """,
+        """),
             conn,
-            params=(ts, ts2),
+            params={"sdate": ts, "edate": ts2},
             index_col=None,
         )
     res = {
@@ -67,21 +82,16 @@ def do(ts, ts2):
     return json.dumps(res)
 
 
+def get_mckey(environ):
+    """Figure out the memcache key"""
+    return (
+        f"/json/huc12data/{environ['sdate']:%Y%m%d}_{environ['edate']:%Y%m%d}"
+    )
+
+
+@iemapp(help=__doc__, schema=Schema, memcachekey=get_mckey)
 def application(environ, start_response):
     """Do Fun things"""
     headers = [("Content-Type", "application/json")]
     start_response("200 OK", headers)
-    form = parse_formvars(environ)
-    ts = datetime.datetime.strptime(form.get("sdate"), "%Y%m%d")
-    ts2 = datetime.datetime.strptime(form.get("edate"), "%Y%m%d")
-
-    mckey = f"/json/huc12data/{ts:%Y%m%d}_{ts2:%Y%m%d}/v2"
-    mc = Client("iem-memcached:11211")
-    res = mc.get(mckey)
-    if res is None:
-        res = do(ts, ts2)
-        mc.set(mckey, res, 3600)
-    else:
-        res = res.decode("utf-8")
-    mc.close()
-    return [res.encode("ascii")]
+    return do(environ["sdate"], environ["edate"])

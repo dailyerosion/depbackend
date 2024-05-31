@@ -1,12 +1,30 @@
 """HUC12 Summary Info."""
 
-from datetime import datetime
+from datetime import date
 from io import StringIO
 
 import pandas as pd
-from paste.request import parse_formvars
-from pyiem.util import get_sqlalchemy_conn
+from pydantic import Field
+from pyiem.database import get_sqlalchemy_conn
+from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
 from sqlalchemy import text
+
+
+class Schema(CGIModel):
+    """See how we are called."""
+
+    huc12: ListOrCSVType = Field(
+        default=["070600040601"],
+        description="Comma delimited list of HUC12s to summarize",
+    )
+    sdate: date = Field(
+        default=date(2022, 1, 1),
+        description="Start date to summarize",
+    )
+    edate: date = Field(
+        default=date(2022, 7, 1),
+        description="End date to summarize",
+    )
 
 
 def gen(huc12s, sdate, edate):
@@ -21,14 +39,14 @@ def gen(huc12s, sdate, edate):
             sum(avg_delivery) * 4.463 as avg_delivery_ton_acre,
             sum(qc_precip) / 25.4 as rain_inch
             from results_by_huc12
-            WHERE huc_12 in :h and scenario = 0
+            WHERE huc_12 = Any(:h) and scenario = 0
             and valid >= :sdate and valid <= :edate
             GROUP by huc_12 ORDER by huc_12
         """
             ),
             conn,
             params={
-                "h": tuple(huc12s),
+                "h": huc12s,
                 "sdate": sdate,
                 "edate": edate,
             },
@@ -38,12 +56,10 @@ def gen(huc12s, sdate, edate):
     return sio.getvalue()
 
 
+@iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """Do something fun"""
-    form = parse_formvars(environ)
-    huc12s = [x[:12] for x in form.getall("huc12")][:64]
-    sdate = datetime.strptime(form.get("sdate", "2022-01-01"), "%Y-%m-%d")
-    edate = datetime.strptime(form.get("edate", "2022-07-01"), "%Y-%m-%d")
+    huc12s = [x[:12] for x in environ["huc12"]][:64]
 
     start_response("200 OK", [("Content-type", "text/plain")])
-    return [gen(huc12s, sdate, edate).encode("utf-8")]
+    return [gen(huc12s, environ["sdate"], environ["edate"]).encode("utf-8")]

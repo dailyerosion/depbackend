@@ -6,9 +6,24 @@ from io import BytesIO
 
 import numpy as np
 import seaborn as sns
-from paste.request import parse_formvars
+from pydantic import Field
 from pydep.io.wepp import read_slp
 from pyiem.plot.use_agg import plt
+from pyiem.webutil import CGIModel, iemapp
+
+
+class Schema(CGIModel):
+    """See how we are called."""
+
+    huc12: str = Field(
+        default="070600040601",
+        description="HUC12 to summarize",
+        max_length=12,
+    )
+    scenario: int = Field(
+        default=0,
+        description="Scenario ID to generate metadata for",
+    )
 
 
 def make_plot(huc12, scenario):
@@ -32,11 +47,13 @@ def make_plot(huc12, scenario):
     ).plot_joint(sns.kdeplot, n_levels=6)
     g.ax_joint.set_xlabel("Slope Length [m]")
     g.ax_joint.set_ylabel("Bulk Slope [%]")
-    g.fig.subplots_adjust(top=0.8, bottom=0.2, left=0.15)
+    g.figure.subplots_adjust(top=0.8, bottom=0.2, left=0.15)
     g.ax_joint.grid()
     g.ax_marg_x.set_title(
-        ("HUC12 %s DEP Hillslope\n" "Kernel Density Estimate (KDE) Overlain")
-        % (huc12,),
+        (
+            f"HUC12 {huc12} DEP Hillslope\n"
+            "Kernel Density Estimate (KDE) Overlain"
+        ),
         fontsize=10,
     )
 
@@ -47,11 +64,8 @@ def make_plot(huc12, scenario):
     return ram.read()
 
 
+@iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """Do something fun"""
-    form = parse_formvars(environ)
-    huc12 = form.get("huc12", "000000000000")[:12]
-    scenario = int(form.get("scenario", 0))
-
     start_response("200 OK", [("Content-type", "image/png")])
-    return [make_plot(huc12, scenario)]
+    return [make_plot(environ["huc12"], environ["scenario"])]

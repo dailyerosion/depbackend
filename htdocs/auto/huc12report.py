@@ -8,7 +8,7 @@ import pandas as pd
 import requests
 from metpy.units import units
 from paste.request import parse_formvars
-from pyiem.util import get_dbconn, get_sqlalchemy_conn
+from pyiem.database import get_dbconn, get_sqlalchemy_conn
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch

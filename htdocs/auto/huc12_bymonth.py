@@ -5,9 +5,10 @@ from io import BytesIO
 
 import numpy as np
 import pandas as pd
-from paste.request import parse_formvars
+from pydantic import Field
+from pyiem.database import get_sqlalchemy_conn
 from pyiem.plot import figure
-from pyiem.util import get_sqlalchemy_conn
+from pyiem.webutil import CGIModel, iemapp
 
 TITLES = {
     "qc_precip": "Precipitation (inch)",
@@ -15,6 +16,20 @@ TITLES = {
     "avg_loss": "Soil Detachment (T/a)",
     "avg_delivery": "Hillslope Soil Delivery (T/a)",
 }
+
+
+class Schema(CGIModel):
+    """See how we are called."""
+
+    huc12: str = Field(
+        default="070600040601",
+        description="HUC12 to summarize",
+        max_length=12,
+    )
+    scenario: int = Field(
+        default=0,
+        description="Scenario ID to generate metadata for",
+    )
 
 
 def make_plot(huc12, scenario):
@@ -88,11 +103,8 @@ def make_plot(huc12, scenario):
     return ram.read()
 
 
+@iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """Do something fun"""
-    form = parse_formvars(environ)
-    huc12 = form.get("huc12", "000000000000")[:12]
-    scenario = int(form.get("scenario", 0))
-
     start_response("200 OK", [("Content-type", "image/png")])
-    return [make_plot(huc12, scenario)]
+    return [make_plot(environ["huc12"], environ["scenario"])]

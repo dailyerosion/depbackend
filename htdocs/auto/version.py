@@ -3,9 +3,19 @@
 from io import StringIO
 
 import pandas as pd
-from paste.request import parse_formvars
-from pyiem.util import get_sqlalchemy_conn
+from pydantic import Field
+from pyiem.database import get_sqlalchemy_conn
+from pyiem.webutil import CGIModel, iemapp
 from sqlalchemy import text
+
+
+class Schema(CGIModel):
+    """See how we are called."""
+
+    scenario: int = Field(
+        default=0,
+        description="Scenario ID to generate metadata for",
+    )
 
 
 def gen(scenario):
@@ -29,9 +39,8 @@ def gen(scenario):
     return sio.getvalue()
 
 
+@iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """Do something fun"""
-    form = parse_formvars(environ)
-    scenario = int(form.get("scenario", 0))
     start_response("200 OK", [("Content-type", "application/json")])
-    return [gen(scenario).encode("utf-8")]
+    return gen(environ["scenario"])
