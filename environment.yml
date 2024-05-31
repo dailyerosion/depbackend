@@ -1,3 +1,4 @@
 dependencies:
-  - pyiem
+  - pydantic
+  - pyiem >=1.20.0
   - pytest

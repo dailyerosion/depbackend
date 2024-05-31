@@ -7,11 +7,23 @@ import tempfile
 import zipfile
 
 from geopandas import GeoDataFrame
-from paste.request import parse_formvars
-from pyiem.util import get_sqlalchemy_conn
+from pydantic import Field
+from pyiem.database import get_sqlalchemy_conn
+from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
 from sqlalchemy import text
 
 PRJFILE = "/opt/iem/data/gis/meta/5070.prj"
+
+
+class Schema(CGIModel):
+    """See how we are called."""
+
+    dt: datetime.date = Field(..., description="Date to query")
+    dt2: datetime.date = Field(None, description="Optional end date")
+    states: ListOrCSVType = Field(
+        None, description="Optional comma delimited states"
+    )
+    conv: str = Field("metric", description="Output units, metric or english")
 
 
 def workflow(start_response, dt, dt2, states, conv):
@@ -22,11 +34,9 @@ def workflow(start_response, dt, dt2, states, conv):
         dextra = "valid >= :dt and valid <= :dt2"
         params["dt2"] = dt2
     statelimit = ""
-    if states is not None:
-        tokens = states.split(",")
-        if tokens:
-            _s = [f" states ~* '{a}' " for a in tokens]
-            statelimit = " and (" + " or ".join(_s) + " ) "
+    if states:
+        _s = [f" states ~* '{a[:2]}' " for a in states]
+        statelimit = " and (" + " or ".join(_s) + " ) "
     with get_sqlalchemy_conn("idep") as conn:
         df = GeoDataFrame.from_postgis(
             text(
@@ -95,13 +105,11 @@ def workflow(start_response, dt, dt2, states, conv):
     return res
 
 
+@iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """Generate something nice for the users"""
-    form = parse_formvars(environ)
-    dt = datetime.datetime.strptime(form.get("dt", "2019-12-11"), "%Y-%m-%d")
-    dt2 = form.get("dt2")
-    states = form.get("states")
-    conv = form.get("conv", "metric")
-    if dt2 is not None:
-        dt2 = datetime.datetime.strptime(form.get("dt2"), "%Y-%m-%d")
+    dt = environ["dt"]
+    dt2 = environ["dt2"]
+    states = environ["states"]
+    conv = environ["conv"]
     return [workflow(start_response, dt, dt2, states, conv)]

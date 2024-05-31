@@ -1,8 +1,8 @@
 """Answer /geojson/huc12.geojson with static metadata."""
 
 import geopandas as gpd
-from pyiem.util import get_sqlalchemy_conn
-from pymemcache.client import Client
+from pyiem.database import get_sqlalchemy_conn
+from pyiem.webutil import iemapp
 
 
 def do():
@@ -22,17 +22,13 @@ def do():
     return df.to_json()
 
 
+@iemapp(
+    content_type="application/vnd.geo+json",
+    memcachekey="/geojson/huc12.geojson",
+    memcacheexpire=86400,
+)
 def application(_environ, start_response):
     """Do Fun things"""
     headers = [("Content-Type", "application/vnd.geo+json")]
     start_response("200 OK", headers)
-    mckey = "/geojson/huc12.geojson"
-    mc = Client("iem-memcached:11211")
-    res = mc.get(mckey)
-    if res is None:
-        res = do()
-        mc.set(mckey, res, 86400)
-    else:
-        res = res.decode("utf-8")
-    mc.close()
-    return [res.encode("ascii")]
+    return do()

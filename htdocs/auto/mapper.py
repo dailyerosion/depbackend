@@ -8,7 +8,7 @@ import geopandas as gpd
 import matplotlib.colors as mpcolors
 import pandas as pd
 from matplotlib.patches import Polygon, Rectangle
-from paste.request import parse_formvars
+from pydantic import Field
 from pyiem.database import get_dbconn, get_sqlalchemy_conn
 from pyiem.dep import RAMPS
 from pyiem.plot.colormaps import dep_erosion, james
@@ -16,6 +16,7 @@ from pyiem.plot.geoplot import Z_OVERLAY2, MapPlot
 from pyiem.plot.use_agg import plt
 from pyiem.plot.util import pretty_bins
 from pyiem.reference import EPSG
+from pyiem.webutil import CGIModel, iemapp
 from pymemcache.client import Client
 from sqlalchemy import text
 
@@ -42,9 +43,30 @@ V2UNITS = {
 }
 
 
-def make_overviewmap(form):
+class Schema(CGIModel):
+    """See how we are called."""
+
+    year: int = Field(2024, description="Year of start date.")
+    month: int = Field(1, description="Month of start date.")
+    day: int = Field(1, description="Day of start date.")
+    year2: int = Field(None, description="Year of end date.")
+    month2: int = Field(None, description="Month of end date.")
+    day2: int = Field(None, description="Day of end date.")
+    scenario: int = Field(0, description="Scenario ID")
+    v: str = Field("avg_loss", description="Variable to plot")
+    huc: str = Field(None, description="HUC12 to plot")
+    zoom: float = Field(10.0, description="Zoom level")
+    overview: bool = Field(False, description="Generate overview map")
+    averaged: bool = Field(False, description="Averaged over period")
+    progressbar: bool = Field(False, description="Show progress bar")
+    cruse: bool = Field(False, description="Show crude conversion")
+    iowa: bool = Field(False, description="Limit to Iowa")
+    mn: bool = Field(False, description="Limit to Minnesota")
+
+
+def make_overviewmap(environ):
     """Draw a pretty map of just the HUC."""
-    huc = form.get("huc")
+    huc = environ["huc"]
     plt.close()
     projection = EPSG[5070]
     params = {}
@@ -69,7 +91,7 @@ def make_overviewmap(form):
             index_col="huc_12",
         )
     minx, miny, maxx, maxy = df["geom"].total_bounds
-    buf = float(form.get("zoom", 10.0)) * 1000.0  # 10km
+    buf = environ["zoom"] * 1000.0  # 10km
     hucname = "" if huc not in df.index else df.at[huc, "name"]
     subtitle = "The HUC8 is in tan"
     if len(huc) == 12:
@@ -139,7 +161,7 @@ def label_scenario(ax, scenario, pgconn):
     )
 
 
-def make_map(huc, ts, ts2, scenario, v, form):
+def make_map(huc, ts, ts2, scenario, v, environ):
     """Make the map"""
     projection = EPSG[5070]
     plt.close()
@@ -163,7 +185,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
     aextra = ""
     if ts != ts2:
         title = f"for period between {ts:%-d %b %Y} and {ts2:%-d %b %Y}"
-        if "averaged" in form:
+        if environ["averaged"]:
             aextra = "/yr"
             if f"{ts:%m%d}" == "0101" and f"{ts2:%m%d}" == "1231":
                 title = f"averaged over inclusive years ({ts:%Y}-{ts2:%Y})"
@@ -217,9 +239,9 @@ def make_map(huc, ts, ts2, scenario, v, form):
     elif len(huc) == 12:
         huclimiter = " and i.huc_12 = :huc12 "
         params["huc12"] = huc
-    if "iowa" in form:
+    if environ["iowa"]:
         huclimiter += " and i.states ~* 'IA' "
-    if "mn" in form:
+    if environ["mn"]:
         huclimiter += " and i.states ~* 'MN' "
     if v == "dt":
         with get_sqlalchemy_conn("idep") as conn:
@@ -235,7 +257,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
                 params=params,
                 geom_col="geom",
             )
-    elif "averaged" in form:
+    elif environ["averaged"]:
         with get_sqlalchemy_conn("idep") as conn:
             df = gpd.read_postgis(
                 text(
@@ -332,21 +354,21 @@ def make_map(huc, ts, ts2, scenario, v, form):
         clevlabels=lbl,
         spacing="uniform",
     )
-    if "progressbar" in form:
+    if environ["progressbar"]:
         fig = plt.gcf()
         avgval = df["data"].mean()
-        _ll = ts.year if "averaged" not in form else "Avg"
+        _ll = ts.year if environ["averaged"] else "Avg"
         fig.text(
-            0.01,
+            0.06,
             0.905,
             f"{_ll}: {avgval:4.1f} T/a",
             fontsize=14,
         )
-        bar_width = 0.758
+        bar_width = 0.698
         # yes, a small one off with years having 366 days
         proportion = (ts2 - ts).days / 365.0 * bar_width
         rect1 = Rectangle(
-            (0.15, 0.905),
+            (0.20, 0.905),
             bar_width,
             0.02,
             color="k",
@@ -356,7 +378,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
         )
         fig.patches.append(rect1)
         rect2 = Rectangle(
-            (0.151, 0.907),
+            (0.201, 0.907),
             proportion,
             0.016,
             color=cmap(norm([avgval]))[0],
@@ -365,7 +387,7 @@ def make_map(huc, ts, ts2, scenario, v, form):
             figure=fig,
         )
         fig.patches.append(rect2)
-    if "cruse" in form:
+    if environ["cruse"]:
         # Crude conversion of T/a to mm depth
         depth = avgval / 5.0
         mp.ax.text(
@@ -390,30 +412,28 @@ def make_map(huc, ts, ts2, scenario, v, form):
 
 def main(environ):
     """Do something fun"""
-    form = parse_formvars(environ)
-    year = form.get("year", 2015)
-    month = form.get("month", 5)
-    day = form.get("day", 5)
-    year2 = form.get("year2", year)
-    month2 = form.get("month2", month)
-    day2 = form.get("day2", day)
-    scenario = int(form.get("scenario", 0))
-    v = form.get("v", "avg_loss")
-    huc = form.get("huc")
+    year = environ["year"]
+    month = environ["month"]
+    day = environ["day"]
+    year2 = year if environ["year2"] is None else environ["year2"]
+    month2 = month if environ["month2"] is None else environ["month2"]
+    day2 = day if environ["day2"] is None else environ["day2"]
+    scenario = environ["scenario"]
+    v = environ["v"]
+    huc = environ["huc"]
 
-    ts = datetime.date(int(year), int(month), int(day))
-    ts2 = datetime.date(int(year2), int(month2), int(day2))
+    ts = datetime.date(year, month, day)
+    ts2 = datetime.date(year2, month2, day2)
     mckey = f"/auto/map.py/{huc}/{ts:%Y%m%d}/{ts2:%Y%m%d}/{scenario}/{v}"
-    if form.get("overview"):
-        mckey = f"/auto/map.py/{huc}/{form.get('zoom')}"
+    if environ["overview"]:
+        mckey = f"/auto/map.py/{huc}/{environ['zoom']}"
     mc = Client("iem-memcached:11211")
     res = mc.get(mckey)
     if res is None:
-        # Lazy import to help speed things up
-        if form.get("overview"):
-            res, do_cache = make_overviewmap(form)
+        if environ["overview"]:
+            res, do_cache = make_overviewmap(environ)
         else:
-            res, do_cache = make_map(huc, ts, ts2, scenario, v, form)
+            res, do_cache = make_map(huc, ts, ts2, scenario, v, environ)
         sys.stderr.write(f"Setting cache: {mckey}\n")
         if do_cache:
             mc.set(mckey, res, 3600)
@@ -421,6 +441,7 @@ def main(environ):
     return res
 
 
+@iemapp(help=__doc__, schema=Schema, parse_times=False)
 def application(environ, start_response):
     """Our mod-wsgi handler"""
     output = main(environ)

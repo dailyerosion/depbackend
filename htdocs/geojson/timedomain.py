@@ -3,10 +3,17 @@
 import datetime
 import json
 
-from paste.request import parse_formvars
-from pyiem.util import get_dbconn
+from pydantic import Field
+from pyiem.database import get_dbconn
+from pyiem.webutil import CGIModel, iemapp
 
 ISO = "%Y-%m-%dT%H:%M:%SZ"
+
+
+class Schema(CGIModel):
+    """See how we are called."""
+
+    scenario: int = Field(0, description="Scenario to query for")
 
 
 def get_time(scenario):
@@ -18,10 +25,9 @@ def get_time(scenario):
     d["first_date"] = None
     d["last_date"] = None
     d["scenario"] = scenario
-    key = "last_date_%s" % (scenario,)
+    key = f"last_date_{scenario}"
     cursor.execute(
-        """SELECT value from properties
-    WHERE key = %s""",
+        "SELECT value from properties WHERE key = %s",
         (key,),
     )
     if cursor.rowcount == 1:
@@ -30,15 +36,14 @@ def get_time(scenario):
         d["last_date"] = datetime.datetime.strptime(
             row[0], "%Y-%m-%d"
         ).strftime(ISO)
-
+    cursor.close()
+    pgconn.close()
     return d
 
 
+@iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """DO Something"""
-    form = parse_formvars(environ)
-    scenario = int(form.get("scenario", 0))
     headers = [("Content-type", "application/json")]
     start_response("200 OK", headers)
-
-    return [json.dumps(get_time(scenario)).encode("ascii")]
+    return json.dumps(get_time(environ["scenario"]))
