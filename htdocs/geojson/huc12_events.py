@@ -5,11 +5,26 @@ import json
 from io import BytesIO
 
 import pandas as pd
-from paste.request import parse_formvars
-from pyiem.util import get_sqlalchemy_conn
+from pydantic import Field
+from pyiem.database import get_sqlalchemy_conn
+from pyiem.webutil import CGIModel, iemapp
 from pymemcache.client import Client
 
 EXL = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+class Schema(CGIModel):
+    """See how we are called."""
+
+    callback: str = Field(None, description="JSONP callback function")
+    huc12: str = Field(
+        "000000000000",
+        description="HUC12 identifier",
+        min_length=12,
+        max_length=12,
+    )
+    mode: str = Field("daily", description="daily or yearly summary")
+    format: str = Field("json", description="json or xlsx")
 
 
 def do(huc12, mode, fmt):
@@ -92,13 +107,13 @@ def do(huc12, mode, fmt):
     return json.dumps(res)
 
 
+@iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """Do Fun things"""
-    form = parse_formvars(environ)
-    cb = form.get("callback", None)
-    huc12 = form.get("huc12", "000000000000")[:12]
-    mode = form.get("mode", "daily")
-    fmt = form.get("format", "json")
+    cb = environ["callback"]
+    huc12 = environ["huc12"]
+    mode = environ["mode"]
+    fmt = environ["format"]
 
     if fmt == "json":
         headers = [("Content-Type", "application/vnd.geo+json")]
@@ -123,4 +138,4 @@ def application(environ, start_response):
     mc.close()
     if cb is not None:
         res = f"{cb}({res})"
-    return [res.encode("ascii")]
+    return res

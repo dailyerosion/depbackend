@@ -7,8 +7,9 @@ from io import BytesIO
 import pandas as pd
 import requests
 from metpy.units import units
-from paste.request import parse_formvars
+from pydantic import Field
 from pyiem.database import get_dbconn, get_sqlalchemy_conn
+from pyiem.webutil import CGIModel, iemapp
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
@@ -49,6 +50,17 @@ LOCALIZATION = {
         ),
     ],
 }
+
+
+class Schema(CGIModel):
+    """See how we are called."""
+
+    huc: str = Field(
+        "070801050306",
+        description="HUC12 to generate report for",
+        min_length=8,
+        max_length=12,
+    )
 
 
 def m2f(val):
@@ -364,10 +376,10 @@ def get_image_bytes(uri):
     return image
 
 
+@iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """See how we are called"""
-    form = parse_formvars(environ)
-    huc12 = form.get("huc", "070801050306")[:12]
+    huc12 = environ["huc"]
     ishuc12 = len(huc12) == 12
     bio = BytesIO()
     styles = getSampleStyleSheet()

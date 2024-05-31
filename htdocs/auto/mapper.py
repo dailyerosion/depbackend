@@ -46,9 +46,9 @@ V2UNITS = {
 class Schema(CGIModel):
     """See how we are called."""
 
-    year: int = Field(..., description="Year of start date.")
-    month: int = Field(..., description="Month of start date.")
-    day: int = Field(..., description="Day of start date.")
+    year: int = Field(2024, description="Year of start date.")
+    month: int = Field(1, description="Month of start date.")
+    day: int = Field(1, description="Day of start date.")
     year2: int = Field(None, description="Year of end date.")
     month2: int = Field(None, description="Month of end date.")
     day2: int = Field(None, description="Day of end date.")

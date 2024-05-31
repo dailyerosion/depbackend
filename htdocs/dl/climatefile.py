@@ -4,10 +4,22 @@ import os
 from io import StringIO
 
 import pandas as pd
-from paste.request import parse_formvars
+from pydantic import Field
 from pydep.io.wepp import read_cli
 from pyiem.dep import get_cli_fname
 from pyiem.iemre import EAST, NORTH, SOUTH, WEST
+from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
+
+
+class Schema(CGIModel):
+    """See how we are called."""
+
+    lat: float = Field(..., description="Latitude of point")
+    lon: float = Field(..., description="Longitude of point")
+    format: str = Field("wepp", description="Output format, wepp or ntt")
+    intensity: ListOrCSVType = Field(
+        None, description="Comma delimited list of intensities to compute"
+    )
 
 
 def spiral(lon, lat):
@@ -29,17 +41,12 @@ def spiral(lon, lat):
     return None
 
 
+@iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """Go Main Go."""
-    form = parse_formvars(environ)
-    fmt = form.get("format", "wepp")
-    try:
-        lat = float(form.get("lat"))
-        lon = float(form.get("lon"))
-    except (ValueError, TypeError):
-        headers = [("Content-type", "text/plain")]
-        start_response("500 Internal Server Error", headers)
-        return [b"API FAIL!"]
+    fmt = environ["format"]
+    lon = environ["lon"]
+    lat = environ["lat"]
     # 23 Jun 2022 restrict domain to decent data bounds
     if lon < WEST or lon > EAST or lat < SOUTH or lat > NORTH:
         headers = [("Content-type", "text/plain")]
@@ -62,8 +69,8 @@ def application(environ, start_response):
         ("Content-Disposition", f"attachment; filename={dlfn}"),
     ]
     start_response("200 OK", headers)
-    if form.get("intensity") is not None:
-        levels = [int(x) for x in form["intensity"].split(",")]
+    if environ["intensity"]:
+        levels = [int(x) for x in environ["intensity"]]
         df = read_cli(fn, compute_intensity_over=levels)
         df.index.name = "date"
         df = df.loc[: pd.Timestamp("now")]
@@ -73,7 +80,7 @@ def application(environ, start_response):
             "pcpn",
         ] + [f"i{x}_mm" for x in levels]
         df[cols].to_csv(sio, float_format="%.2f")
-        return [sio.getvalue().encode("ascii")]
+        return sio.getvalue()
 
     if fmt == "wepp":
         with open(fn, "rb") as fh:
@@ -89,5 +96,5 @@ def application(environ, start_response):
                 f"{row['tmax']:6.1f} {row['tmin']:6.1f} {row['pcpn']:6.2f}"
                 "\r\n"
             )
-        payload = payload.getvalue().encode("ascii")
-    return [payload]
+        payload = payload.getvalue()
+    return payload
