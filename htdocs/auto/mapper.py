@@ -1,7 +1,6 @@
 """Mapping Interface."""
 
 import datetime
-import sys
 from io import BytesIO
 
 import geopandas as gpd
@@ -9,15 +8,15 @@ import matplotlib.colors as mpcolors
 import pandas as pd
 from matplotlib.patches import Polygon, Rectangle
 from pydantic import Field
-from pyiem.database import get_dbconn, get_sqlalchemy_conn
+from pyiem.database import get_sqlalchemy_conn
 from pyiem.dep import RAMPS
+from pyiem.exceptions import NoDataFound
 from pyiem.plot.colormaps import dep_erosion, james
 from pyiem.plot.geoplot import Z_OVERLAY2, MapPlot
 from pyiem.plot.use_agg import plt
 from pyiem.plot.util import pretty_bins
 from pyiem.reference import EPSG
 from pyiem.webutil import CGIModel, iemapp
-from pymemcache.client import Client
 from sqlalchemy import text
 
 V2NAME = {
@@ -137,18 +136,20 @@ def make_overviewmap(environ):
     plt.savefig(ram, format="png", dpi=100)
     plt.close()
     ram.seek(0)
-    return ram.read(), True
+    return ram.read()
 
 
-def label_scenario(ax, scenario, pgconn):
+def label_scenario(ax, scenario, conn):
     """Overlay a simple label of this scenario."""
     if scenario == 0:
         return
-    cursor = pgconn.cursor()
-    cursor.execute("select label from scenarios where id = %s", (scenario,))
-    if cursor.rowcount == 0:
+    res = conn.execute(
+        text("select label from scenarios where id = :id"),
+        {"id": scenario},
+    )
+    if res.rowcount == 0:
         return
-    label = cursor.fetchone()[0]
+    label = res.fetchone()[0]
     ax.text(
         0.99,
         0.99,
@@ -161,7 +162,7 @@ def label_scenario(ax, scenario, pgconn):
     )
 
 
-def make_map(huc, ts, ts2, scenario, v, environ):
+def make_map(conn, huc, ts, ts2, scenario, v, environ):
     """Make the map"""
     projection = EPSG[5070]
     plt.close()
@@ -178,9 +179,6 @@ def make_map(huc, ts, ts2, scenario, v, environ):
         # c =['#ffffd2', '#ffff4d', '#ffe0a5', '#eeb74d', '#ba7c57', '#96504d']
         cmap = dep_erosion()
 
-    pgconn = get_dbconn("idep")
-    cursor = pgconn.cursor()
-
     title = f"for {ts:%-d %B %Y}"
     aextra = ""
     if ts != ts2:
@@ -195,33 +193,23 @@ def make_map(huc, ts, ts2, scenario, v, environ):
                     f"({ts:%Y}-{ts2:%Y})"
                 )
     # Compute what the huc12 scenario is for this scenario
-    cursor.execute(
-        "select huc12_scenario from scenarios where id = %s", (scenario,)
+    res = conn.execute(
+        text("select huc12_scenario from scenarios where id = :id"),
+        {"id": scenario},
     )
-    huc12_scenario = cursor.fetchone()[0]
+    huc12_scenario = res.fetchone()[0]
 
     # Check that we have data for this date!
-    cursor.execute(
-        "SELECT value from properties where key = 'last_date_0'",
+    res = conn.execute(
+        text("SELECT value from properties where key = 'last_date_0'"),
     )
-    if cursor.rowcount == 0:
+    if res.rowcount == 0:
         lastts = datetime.datetime(2007, 1, 1)
     else:
-        lastts = datetime.datetime.strptime(cursor.fetchone()[0], "%Y-%m-%d")
+        lastts = datetime.datetime.strptime(res.fetchone()[0], "%Y-%m-%d")
     floor = datetime.date(2007, 1, 1)
     if ts > lastts.date() or ts2 > lastts.date() or ts < floor:
-        plt.text(
-            0.5,
-            0.5,
-            "Data Not Available\nPlease Check Back Later!",
-            fontsize=20,
-            ha="center",
-        )
-        ram = BytesIO()
-        plt.savefig(ram, format="png", dpi=100)
-        plt.close()
-        ram.seek(0)
-        return ram.read(), False
+        raise NoDataFound("Data Not Availale Yet, check back later.")
     params = {
         "scenario": scenario,
         "huc12_scenario": huc12_scenario,
@@ -244,64 +232,61 @@ def make_map(huc, ts, ts2, scenario, v, environ):
     if environ["mn"]:
         huclimiter += " and i.states ~* 'MN' "
     if v == "dt":
-        with get_sqlalchemy_conn("idep") as conn:
-            df = gpd.read_postgis(
-                text(
-                    f"""
-            SELECT simple_geom as geom,
-            dominant_tillage as data
-            from huc12 i WHERE scenario = :huc12_scenario {huclimiter}
-            """
-                ),
-                conn,
-                params=params,
-                geom_col="geom",
-            )
+        df = gpd.read_postgis(
+            text(
+                f"""
+        SELECT simple_geom as geom,
+        dominant_tillage as data
+        from huc12 i WHERE scenario = :huc12_scenario {huclimiter}
+        """
+            ),
+            conn,
+            params=params,
+            geom_col="geom",
+        )
     elif environ["averaged"]:
-        with get_sqlalchemy_conn("idep") as conn:
-            df = gpd.read_postgis(
-                text(
-                    f"""
-            WITH data as (
-            SELECT huc_12, sum({v}) / 10. as d from results_by_huc12
-            WHERE scenario = :scenario and to_char(valid, 'mmdd') between
-            :sday1 and :sday2
-            and valid between :ts and :ts2
-            GROUP by huc_12)
+        df = gpd.read_postgis(
+            text(
+                f"""
+        WITH data as (
+        SELECT huc_12, sum({v}) / 10. as d from results_by_huc12
+        WHERE scenario = :scenario and to_char(valid, 'mmdd') between
+        :sday1 and :sday2
+        and valid between :ts and :ts2
+        GROUP by huc_12)
 
-            SELECT simple_geom as geom,
-            coalesce(d.d, 0) * :dbcol as data
-            from huc12 i LEFT JOIN data d
-            ON (i.huc_12 = d.huc_12) WHERE i.scenario = :huc12_scenario
-            {huclimiter}
-            """
-                ),
-                conn,
-                params=params,
-                geom_col="geom",
-            )
+        SELECT simple_geom as geom,
+        coalesce(d.d, 0) * :dbcol as data
+        from huc12 i LEFT JOIN data d
+        ON (i.huc_12 = d.huc_12) WHERE i.scenario = :huc12_scenario
+        {huclimiter}
+        """
+            ),
+            conn,
+            params=params,
+            geom_col="geom",
+        )
 
     else:
-        with get_sqlalchemy_conn("idep") as conn:
-            df = gpd.read_postgis(
-                text(
-                    f"""
-            WITH data as (
-            SELECT huc_12, sum({v})  as d from results_by_huc12
-            WHERE scenario = :scenario and valid between :ts and :ts2
-            GROUP by huc_12)
+        df = gpd.read_postgis(
+            text(
+                f"""
+        WITH data as (
+        SELECT huc_12, sum({v})  as d from results_by_huc12
+        WHERE scenario = :scenario and valid between :ts and :ts2
+        GROUP by huc_12)
 
-            SELECT simple_geom as geom,
-            coalesce(d.d, 0) * :dbcol as data
-            from huc12 i LEFT JOIN data d
-            ON (i.huc_12 = d.huc_12) WHERE i.scenario = :huc12_scenario
-            {huclimiter}
-            """
-                ),
-                conn,
-                params=params,
-                geom_col="geom",
-            )
+        SELECT simple_geom as geom,
+        coalesce(d.d, 0) * :dbcol as data
+        from huc12 i LEFT JOIN data d
+        ON (i.huc_12 = d.huc_12) WHERE i.scenario = :huc12_scenario
+        {huclimiter}
+        """
+            ),
+            conn,
+            params=params,
+            geom_col="geom",
+        )
     minx, miny, maxx, maxy = df["geom"].total_bounds
     buf = 10000.0  # 10km
     mp = MapPlot(
@@ -340,7 +325,7 @@ def make_map(huc, ts, ts2, scenario, v, environ):
         )
         mp.ax.add_patch(p)
 
-    label_scenario(mp.ax, scenario, pgconn)
+    label_scenario(mp.ax, scenario, conn)
 
     lbl = [round(_, 2) for _ in bins]
     if huc is not None:
@@ -406,46 +391,53 @@ def make_map(huc, ts, ts2, scenario, v, environ):
     plt.savefig(ram, format="png", dpi=100)
     plt.close()
     ram.seek(0)
-    pgconn.close()
-    return ram.read(), True
+    return ram.read()
 
 
-def main(environ):
-    """Do something fun"""
+def get_ts_ts2(environ):
+    """Figure out the ts and ts2."""
     year = environ["year"]
     month = environ["month"]
     day = environ["day"]
     year2 = year if environ["year2"] is None else environ["year2"]
     month2 = month if environ["month2"] is None else environ["month2"]
     day2 = day if environ["day2"] is None else environ["day2"]
+    ts = datetime.date(year, month, day)
+    ts2 = datetime.date(year2, month2, day2)
+    return ts, ts2
+
+
+def get_mckey(environ):
+    """Figure out the memcache key."""
+    ts, ts2 = get_ts_ts2(environ)
+    key = (
+        f"/auto/map.py/{environ['huc']}/{ts:%Y%m%d}/{ts2:%Y%m%d}/"
+        f"{environ['scenario']}/{environ['v']}"
+    )
+    if environ["overview"]:
+        key = f"/auto/map.py/{environ['huc']}/{environ['zoom']}"
+    return key
+
+
+@iemapp(
+    memcachekey=get_mckey,
+    content_type="image/png",
+    help=__doc__,
+    schema=Schema,
+    parse_times=False,
+)
+def application(environ, start_response):
+    """Our mod-wsgi handler"""
+    response_headers = [("Content-type", "image/png")]
+    start_response("200 OK", response_headers)
     scenario = environ["scenario"]
     v = environ["v"]
     huc = environ["huc"]
+    ts, ts2 = get_ts_ts2(environ)
+    if environ["overview"] and huc is not None:
+        res = make_overviewmap(environ)
+    else:
+        with get_sqlalchemy_conn("idep") as conn:
+            res = make_map(conn, huc, ts, ts2, scenario, v, environ)
 
-    ts = datetime.date(year, month, day)
-    ts2 = datetime.date(year2, month2, day2)
-    mckey = f"/auto/map.py/{huc}/{ts:%Y%m%d}/{ts2:%Y%m%d}/{scenario}/{v}"
-    if environ["overview"]:
-        mckey = f"/auto/map.py/{huc}/{environ['zoom']}"
-    mc = Client("iem-memcached:11211")
-    res = mc.get(mckey)
-    if res is None:
-        if environ["overview"]:
-            res, do_cache = make_overviewmap(environ)
-        else:
-            res, do_cache = make_map(huc, ts, ts2, scenario, v, environ)
-        sys.stderr.write(f"Setting cache: {mckey}\n")
-        if do_cache:
-            mc.set(mckey, res, 3600)
-    mc.close()
     return res
-
-
-@iemapp(help=__doc__, schema=Schema, parse_times=False)
-def application(environ, start_response):
-    """Our mod-wsgi handler"""
-    output = main(environ)
-    response_headers = [("Content-type", "image/png")]
-    start_response("200 OK", response_headers)
-
-    return [output]
