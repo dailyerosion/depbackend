@@ -33,7 +33,7 @@ Include /opt/iemwebfarm/config/vhost_common.conf
     RewriteRule ^([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]+)_(.*).png$ mapper.py?year=$1&month=$2&day=$3&year2=$4&month2=$5&day2=$6&scenario=$7&v=$8 [QSA]
     RewriteRule ^huc([0-9]{8,12})_([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]{4})([01][0-9])([0-3][0-9])_([0-9]+)_(.*).png$ mapper.py?year=$2&month=$3&day=$4&year2=$5&month2=$6&day2=$7&scenario=$8&v=$9&huc=$1 [QSA]
     RewriteRule ^([0-9]{8,12})_report.pdf$ huc12report.py?huc=$1 [QSA]
-    RewriteRule ^([0-9]{8})_([0-9]{8}).json$ huc12data.py?sdate=$1&edate=$2 [QSA]
+    RewriteRule ^([0-9]{4})([0-9]{2})([0-9]{2})_([0-9]{4})([0-9]{2})([0-9]{2}).json$ huc12data.py?sdate=$1-$2-$3&edate=$4-$5-$6 [QSA]
   </Directory>
 
   <Directory "/opt/depbackend/htdocs/geojson">
