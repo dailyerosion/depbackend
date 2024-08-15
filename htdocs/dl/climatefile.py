@@ -1,14 +1,26 @@
-"""Service providing a WEPP climate file."""
+""".. title:: DEP Climate File by Lat/Lon Point
+
+This service provides a download of a climate file for a given latitude and
+longitude point.  The service will search for the nearest climate file to the
+requested point and provide it for download.
+
+"""
 
 import os
 from io import StringIO
+from typing import Tuple
 
 import pandas as pd
 from pydantic import Field
 from pydep.io.wepp import read_cli
+from pyiem import iemre
+from pyiem.database import get_sqlalchemy_conn
 from pyiem.dep import get_cli_fname
-from pyiem.iemre import EAST, NORTH, SOUTH, WEST
+from pyiem.util import logger
 from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
+from sqlalchemy import text
+
+LOG = logger()
 
 
 class Schema(CGIModel):
@@ -22,7 +34,7 @@ class Schema(CGIModel):
     )
 
 
-def spiral(lon, lat):
+def spiral(lon: float, lat: float) -> Tuple[str, float]:
     """https://stackoverflow.com/questions/398299/looping-in-a-spiral"""
     x = y = 0
     dx = 0
@@ -31,14 +43,35 @@ def spiral(lon, lat):
     X = 40
     Y = 40
     for _ in range(40**2):
+        distance = ((x * 0.01) ** 2 + (y * 0.01) ** 2) ** 0.5
         if (-X / 2 < x <= X / 2) and (-Y / 2 < y <= Y / 2):
             newfn = get_cli_fname(lon + x * 0.01, lat + y * 0.01)
             if os.path.isfile(newfn):
-                return newfn
+                return newfn, distance
         if x == y or (x < 0 and x == -y) or (x > 0 and x == 1 - y):
             dx, dy = -dy, dx
         x, y = x + dx, y + dy
-    return None
+    return None, None
+
+
+def log_request(environ: dict, fn: str, distance: float):
+    """Log this request"""
+    with get_sqlalchemy_conn("idep") as conn:
+        conn.execute(
+            text(
+                "INSERT into clifile_requests(client_addr, geom, "
+                "provided_file, distance_degrees) VALUES "
+                "(:addr, ST_Point(:lon, :lat, 4326), :fn, :dist)",
+            ),
+            {
+                "lon": environ["lon"],
+                "lat": environ["lat"],
+                "fn": fn,
+                "dist": distance,
+                "addr": environ.get("REMOTE_ADDR"),
+            },
+        )
+        conn.commit()
 
 
 @iemapp(help=__doc__, schema=Schema)
@@ -47,19 +80,31 @@ def application(environ, start_response):
     fmt = environ["format"]
     lon = environ["lon"]
     lat = environ["lat"]
-    # 23 Jun 2022 restrict domain to decent data bounds
-    if lon < WEST or lon > EAST or lat < SOUTH or lat > NORTH:
+    dom = iemre.DOMAINS[""]
+    if (
+        lon < dom["west"]
+        or lon > dom["east"]
+        or lat < dom["south"]
+        or lat > dom["north"]
+    ):
         headers = [("Content-type", "text/plain")]
         start_response("500 Internal Server Error", headers)
         errmsg = (
-            f"Requested point outside of bounds {WEST},{SOUTH} {EAST},{NORTH}!"
+            f"Requested point outside of bounds {dom['west']},{dom['south']} "
+            f"{dom['east']},{dom['north']}!"
         )
         return [errmsg.encode("ascii")]
-    fn = spiral(lon, lat)
+    fn, distance = spiral(lon, lat)
     if fn is None:
         headers = [("Content-type", "text/plain")]
         start_response("500 Internal Server Error", headers)
         return [b"Failed to locate a climate file in vicinity of your point."]
+    if fmt == "wepp":
+        # Log this request
+        try:
+            log_request(environ, fn, distance)
+        except Exception as exp:
+            LOG.exception(exp)
 
     dlfn = os.path.basename(fn)
     if fmt == "ntt":
