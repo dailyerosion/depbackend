@@ -18,9 +18,7 @@ class Schema(CGIModel):
     """See how we are called."""
 
     callback: str = Field(None, description="JSONP callback function")
-    date: datetime.date = Field(
-        datetime.date(2015, 5, 5), description="Date to query"
-    )
+    date: datetime.date = Field(..., description="Date to query")
     date2: datetime.date = Field(
         None, description="Optional end date to query"
     )
