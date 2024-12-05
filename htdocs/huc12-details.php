@@ -42,10 +42,12 @@ echo <<<EOF
 <br />&nbsp;
 <p>
 <button onclick="javascript: viewEvents('{$huc_12}', 'daily');"
- class="btn btn-sm btn-primary" type="button" data-toggle="modal" data-target="#eventsModal">
+ class="btn btn-sm btn-primary" type="button" data-bs-toggle="modal"
+ data-bs-target="#eventsModal">
  <i class="fa fa-th-list"></i> View Daily Data</button>
 <button onclick="javascript: viewEvents('{$huc_12}', 'yearly');"
- class="btn btn-sm btn-primary" type="button" data-toggle="modal" data-target="#eventsModal">
+ class="btn btn-sm btn-primary" type="button" data-bs-toggle="modal"
+ data-bs-target="#eventsModal">
  <i class="fa fa-th-list"></i> View Yearly Data</button>
 </p>
 </form>
