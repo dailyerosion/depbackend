@@ -4,6 +4,7 @@ $huc_12 = isset($_REQUEST['huc12']) ? substr($_REQUEST['huc12'], 0, 12) : die();
 $date = isset($_REQUEST['date']) ? strtotime($_REQUEST['date']) : die();
 $date2 = isset($_REQUEST['date2']) ? strtotime($_REQUEST['date2']) : null;
 $scenario = isset($_REQUEST["scenario"]) ? intval($_REQUEST["scenario"]) : 0;
+$metric = isset($_REQUEST["metric"]) ? intval($_REQUEST["metric"]) : 0;
 $year = date("Y", $date);
 
 $dbconn = pg_connect("dbname=idep host=iemdb-idep.local user=nobody");
@@ -24,7 +25,7 @@ $rs = pg_prepare(
 );
 $rs = timeit($dbconn, "SELECT", array($huc_12, $scenario));
 if (pg_num_rows($rs) != 1) {
-    echo "ERROR: No township found!";
+    echo "ERROR: HUC12 was not found!";
     die();
 }
 $row = pg_fetch_assoc($rs, 0);
@@ -76,11 +77,25 @@ if (pg_num_rows($rs) == 0) {
 } else {
     $row = pg_fetch_assoc($rs, 0);
 }
+if ($metric == 0) {
+    $row["qc_precip"] = $row["qc_precip"] / 25.4;
+    $row["avg_runoff"] = $row["avg_runoff"] / 25.4;
+    $row["avg_loss"] = $row["avg_loss"] * 4.463;
+    $row["avg_delivery"] = $row["avg_delivery"] * 4.463;
+    $punit = "inch";
+    $lunit = "ton/acre";
+} else {
+    // Convert kg/m2 to tonnes/ha
+    $row["avg_loss"] = $row["avg_loss"] * 10;
+    $row["avg_delivery"] = $row["avg_delivery"] * 10;
+    $punit = "mm";
+    $lunit = "tonne/ha";
+}
 echo '<table class="table table-condensed table-bordered">';
-echo "<tr><th>Precipitation</th><td>" . sprintf("%.2f in", $row["qc_precip"] / 25.4) . "</td></tr>";
-echo "<tr><th>Runoff</th><td>" . sprintf("%.2f in", $row["avg_runoff"] / 25.4) . "</td></tr>";
-echo "<tr><th>Detachment</th><td>" . sprintf("%.2f T/A", $row["avg_loss"] * 4.463) . "</td></tr>";
-echo "<tr><th>Hillslope Soil Loss</th><td>" . sprintf("%.2f T/A", $row["avg_delivery"] * 4.463) . "</td></tr>";
+echo "<tr><th>Precipitation</th><td>" . sprintf("%.2f %s", $row["qc_precip"], $punit) . "</td></tr>";
+echo "<tr><th>Runoff</th><td>" . sprintf("%.2f %s", $row["avg_runoff"], $punit) . "</td></tr>";
+echo "<tr><th>Detachment</th><td>" . sprintf("%.2f %s", $row["avg_loss"], $lunit) . "</td></tr>";
+echo "<tr><th>Hillslope Soil Loss</th><td>" . sprintf("%.2f %s", $row["avg_delivery"], $lunit) . "</td></tr>";
 echo "</table>";
 
 /* Get top events */
@@ -99,7 +114,7 @@ if (pg_num_rows($rs) == 0) {
             echo "<tr>";
         }
         echo sprintf(
-            "<td><span class=\"badge\">%s</span> <a href='javascript:setDate(%s,%s,%s);'>%s</a></td>",
+            "<td><span class=\"badge text-bg-secondary\">%s</span> <a href='javascript:setDate(%s,%s,%s);'>%s</a></td>",
             $i + 1,
             date("Y", $ts),
             date("m", $ts),
