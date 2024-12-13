@@ -26,8 +26,8 @@ LOG = logger()
 class Schema(CGIModel):
     """See how we are called."""
 
-    lat: float = Field(..., description="Latitude of point")
-    lon: float = Field(..., description="Longitude of point")
+    lat: float = Field(..., description="Latitude of point", ge=-90, le=90)
+    lon: float = Field(..., description="Longitude of point", ge=-180, le=180)
     format: str = Field("wepp", description="Output format, wepp or ntt")
     intensity: ListOrCSVType = Field(
         None, description="Comma delimited list of intensities to compute"
@@ -58,11 +58,12 @@ def log_request(environ: dict, fn: str, distance: float):
     """Log this request"""
     with get_sqlalchemy_conn("idep") as conn:
         conn.execute(
-            text(
-                "INSERT into clifile_requests(client_addr, geom, "
-                "provided_file, distance_degrees) VALUES "
-                "(:addr, ST_Point(:lon, :lat, 4326), :fn, :dist)",
-            ),
+            text("""
+    INSERT into clifile_requests(client_addr, geom, climate_file_id,
+    distance_degrees) VALUES (:addr, ST_Point(:lon, :lat, 4326),
+    (select id from climate_files where scenario = 0 and filepath = :fn),
+    :dist)
+    """),
             {
                 "lon": environ["lon"],
                 "lat": environ["lat"],
