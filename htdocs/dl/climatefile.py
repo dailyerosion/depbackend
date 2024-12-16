@@ -8,14 +8,12 @@ requested point and provide it for download.
 
 import os
 from io import StringIO
-from typing import Tuple
 
 import pandas as pd
 from pydantic import Field
 from pydep.io.wepp import read_cli
 from pyiem import iemre
 from pyiem.database import get_sqlalchemy_conn
-from pyiem.dep import get_cli_fname
 from pyiem.util import logger
 from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
 from sqlalchemy import text
@@ -32,26 +30,6 @@ class Schema(CGIModel):
     intensity: ListOrCSVType = Field(
         None, description="Comma delimited list of intensities to compute"
     )
-
-
-def spiral(lon: float, lat: float) -> Tuple[str, float]:
-    """https://stackoverflow.com/questions/398299/looping-in-a-spiral"""
-    x = y = 0
-    dx = 0
-    dy = -1
-    # points near the domain edge need to seach a bit further than 0.25deg
-    X = 40
-    Y = 40
-    for _ in range(40**2):
-        distance = ((x * 0.01) ** 2 + (y * 0.01) ** 2) ** 0.5
-        if (-X / 2 < x <= X / 2) and (-Y / 2 < y <= Y / 2):
-            newfn = get_cli_fname(lon + x * 0.01, lat + y * 0.01)
-            if os.path.isfile(newfn):
-                return newfn, distance
-        if x == y or (x < 0 and x == -y) or (x > 0 and x == 1 - y):
-            dx, dy = -dy, dx
-        x, y = x + dx, y + dy
-    return None, None
 
 
 def log_request(environ: dict, fn: str, distance: float):
@@ -75,6 +53,31 @@ def log_request(environ: dict, fn: str, distance: float):
         conn.commit()
 
 
+def find_closest_file(lon: float, lat: float) -> tuple:
+    """Find the closest climate file to the given point."""
+    with get_sqlalchemy_conn("idep") as conn:
+        res = conn.execute(
+            text("""
+    select filepath, st_distance(geom, ST_Point(:lon, :lat, 4326)) as distance
+    from climate_files where scenario = 0 and
+    ST_Contains(ST_MakeEnvelope(:west, :south, :east, :north, 4326), geom)
+    order by geom <-> ST_Point(:lon, :lat, 4326) asc limit 1
+                 """),
+            {
+                "lon": lon,
+                "lat": lat,
+                "west": lon - 1,
+                "south": lat - 1,
+                "east": lon + 1,
+                "north": lat + 1,
+            },
+        )
+        if res.rowcount == 0:
+            return None, None
+        row = res.first()
+        return row[0], row[1]
+
+
 @iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """Go Main Go."""
@@ -95,7 +98,7 @@ def application(environ, start_response):
             f"{dom['east']},{dom['north']}!"
         )
         return [errmsg.encode("ascii")]
-    fn, distance = spiral(lon, lat)
+    fn, distance = find_closest_file(lon, lat)
     if fn is None:
         headers = [("Content-type", "text/plain")]
         start_response("500 Internal Server Error", headers)
