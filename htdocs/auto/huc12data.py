@@ -1,10 +1,8 @@
 """JSON service for HUC12 data"""
 
-import datetime
+from datetime import date
 
 import pandas as pd
-
-# needed for Decimal formatting to work
 import simplejson as json
 from pydantic import Field
 from pyiem.database import get_sqlalchemy_conn
@@ -17,12 +15,12 @@ from sqlalchemy import text
 class Schema(CGIModel):
     """See how we are called."""
 
-    sdate: datetime.date = Field(
-        default=datetime.date(2010, 1, 1),
+    sdate: date = Field(
+        default=date(2010, 1, 1),
         description="Start Date",
     )
-    edate: datetime.date = Field(
-        default=datetime.date(2010, 1, 1),
+    edate: date = Field(
+        default=date(2010, 1, 1),
         description="End Date",
     )
 
