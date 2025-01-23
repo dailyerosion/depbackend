@@ -1,6 +1,6 @@
 """Mapping Interface."""
 
-import datetime
+from datetime import date, datetime
 from io import BytesIO
 
 import geopandas as gpd
@@ -45,6 +45,7 @@ V2UNITS = {
 class Schema(CGIModel):
     """See how we are called."""
 
+    dpi: int = Field(100, description="Dots per inch", ge=50, le=300)
     year: int = Field(2024, description="Year of start date.")
     month: int = Field(1, description="Month of start date.")
     day: int = Field(1, description="Day of start date.")
@@ -204,10 +205,10 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
         text("SELECT value from properties where key = 'last_date_0'"),
     )
     if res.rowcount == 0:
-        lastts = datetime.datetime(2007, 1, 1)
+        lastts = datetime(2007, 1, 1)
     else:
-        lastts = datetime.datetime.strptime(res.fetchone()[0], "%Y-%m-%d")
-    floor = datetime.date(2007, 1, 1)
+        lastts = datetime.strptime(res.fetchone()[0], "%Y-%m-%d")
+    floor = date(2007, 1, 1)
     if ts > lastts.date() or ts2 > lastts.date() or ts < floor:
         raise NoDataFound("Data Not Availale Yet, check back later.")
     params = {
@@ -388,7 +389,7 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
             color="white",
         )
     ram = BytesIO()
-    plt.savefig(ram, format="png", dpi=100)
+    plt.savefig(ram, format="png", dpi=environ["dpi"])
     plt.close()
     ram.seek(0)
     return ram.read()
@@ -402,8 +403,8 @@ def get_ts_ts2(environ):
     year2 = year if environ["year2"] is None else environ["year2"]
     month2 = month if environ["month2"] is None else environ["month2"]
     day2 = day if environ["day2"] is None else environ["day2"]
-    ts = datetime.date(year, month, day)
-    ts2 = datetime.date(year2, month2, day2)
+    ts = date(year, month, day)
+    ts2 = date(year2, month2, day2)
     return ts, ts2
 
 

@@ -1,7 +1,7 @@
 """Generate a PDF Report for a given HUC12."""
 
 import calendar
-import datetime
+from datetime import datetime
 from io import BytesIO
 
 import pandas as pd
@@ -25,7 +25,7 @@ from reportlab.platypus import (
 
 PAGE_WIDTH = letter[0]
 PAGE_HEIGHT = letter[1]
-GENTIME = datetime.datetime.now().strftime("%B %-d %Y")
+GENTIME = datetime.now().strftime("%B %-d %Y")
 HOST = "http://depbackend.local"
 MAPPER = f"{HOST}/auto/mapper.py"
 INTROTEXT = (
