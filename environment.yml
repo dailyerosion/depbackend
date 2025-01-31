@@ -1,5 +1,10 @@
 dependencies:
+  - pandas
+  # database
+  - postgresql
+  - psycopg
   - pydantic
+  - pygrib
   # sigh, need github main build
   # - pyiem >=1.20.0
   - pytest

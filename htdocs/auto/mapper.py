@@ -69,9 +69,8 @@ def make_overviewmap(environ):
     plt.close()
     projection = EPSG[5070]
     params = {}
-    if huc is None:
-        huclimiter = ""
-    elif len(huc) >= 8:
+    huclimiter = ""
+    if huc is not None and len(huc) >= 8:
         huclimiter = " and substr(huc_12, 1, 8) = :huc8 "
         params["huc8"] = huc[:8]
     with get_sqlalchemy_conn("idep") as conn:
