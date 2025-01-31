@@ -8,7 +8,7 @@ import matplotlib.colors as mpcolors
 import pandas as pd
 from matplotlib.patches import Polygon, Rectangle
 from pydantic import Field
-from pyiem.database import get_sqlalchemy_conn
+from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.dep import RAMPS
 from pyiem.exceptions import NoDataFound
 from pyiem.plot.colormaps import dep_erosion, james
@@ -17,7 +17,6 @@ from pyiem.plot.use_agg import plt
 from pyiem.plot.util import pretty_bins
 from pyiem.reference import EPSG
 from pyiem.webutil import CGIModel, iemapp
-from sqlalchemy import text
 
 V2NAME = {
     "avg_loss": "Detachment",
@@ -77,13 +76,14 @@ def make_overviewmap(environ):
         params["huc8"] = huc[:8]
     with get_sqlalchemy_conn("idep") as conn:
         df = gpd.read_postgis(
-            text(
-                f"""
+            sql_helper(
+                """
             SELECT simple_geom as geom, huc_12,
             ST_x(ST_Transform(ST_Centroid(geom), 4326)) as centroid_x,
             ST_y(ST_Transform(ST_Centroid(geom), 4326)) as centroid_y, name
             from huc12 i WHERE i.scenario = 0 {huclimiter}
-        """
+        """,
+                huclimiter=huclimiter,
             ),
             conn,
             geom_col="geom",
@@ -145,7 +145,7 @@ def label_scenario(ax, scenario, conn):
     if scenario == 0:
         return
     res = conn.execute(
-        text("select label from scenarios where id = :id"),
+        sql_helper("select label from scenarios where id = :id"),
         {"id": scenario},
     )
     if res.rowcount == 0:
@@ -195,14 +195,14 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
                 )
     # Compute what the huc12 scenario is for this scenario
     res = conn.execute(
-        text("select huc12_scenario from scenarios where id = :id"),
+        sql_helper("select huc12_scenario from scenarios where id = :id"),
         {"id": scenario},
     )
     huc12_scenario = res.fetchone()[0]
 
     # Check that we have data for this date!
     res = conn.execute(
-        text("SELECT value from properties where key = 'last_date_0'"),
+        sql_helper("SELECT value from properties where key = 'last_date_0'"),
     )
     if res.rowcount == 0:
         lastts = datetime(2007, 1, 1)
@@ -234,12 +234,13 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
         huclimiter += " and i.states ~* 'MN' "
     if v == "dt":
         df = gpd.read_postgis(
-            text(
-                f"""
+            sql_helper(
+                """
         SELECT simple_geom as geom,
         dominant_tillage as data
         from huc12 i WHERE scenario = :huc12_scenario {huclimiter}
-        """
+        """,
+                huclimiter=huclimiter,
             ),
             conn,
             params=params,
@@ -247,8 +248,8 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
         )
     elif environ["averaged"]:
         df = gpd.read_postgis(
-            text(
-                f"""
+            sql_helper(
+                """
         WITH data as (
         SELECT huc_12, sum({v}) / 10. as d from results_by_huc12
         WHERE scenario = :scenario and to_char(valid, 'mmdd') between
@@ -261,7 +262,9 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
         from huc12 i LEFT JOIN data d
         ON (i.huc_12 = d.huc_12) WHERE i.scenario = :huc12_scenario
         {huclimiter}
-        """
+        """,
+                huclimiter=huclimiter,
+                v=v,
             ),
             conn,
             params=params,
@@ -270,8 +273,8 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
 
     else:
         df = gpd.read_postgis(
-            text(
-                f"""
+            sql_helper(
+                """
         WITH data as (
         SELECT huc_12, sum({v})  as d from results_by_huc12
         WHERE scenario = :scenario and valid between :ts and :ts2
@@ -282,7 +285,9 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
         from huc12 i LEFT JOIN data d
         ON (i.huc_12 = d.huc_12) WHERE i.scenario = :huc12_scenario
         {huclimiter}
-        """
+        """,
+                huclimiter=huclimiter,
+                v=v,
             ),
             conn,
             params=params,

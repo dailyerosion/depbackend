@@ -4,9 +4,8 @@ from io import StringIO
 
 import pandas as pd
 from pydantic import Field
-from pyiem.database import get_sqlalchemy_conn
+from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.webutil import CGIModel, iemapp
-from sqlalchemy import text
 
 
 class Schema(CGIModel):
@@ -23,7 +22,7 @@ def gen(scenario):
     with get_sqlalchemy_conn("idep") as conn:
         # Check that we have data for this date!
         df = pd.read_sql(
-            text(
+            sql_helper(
                 """
             select d.* from scenarios s, dep_version d where s.id = :scenario
             and s.dep_version_label = d.label

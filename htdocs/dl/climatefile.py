@@ -13,10 +13,9 @@ import pandas as pd
 from pydantic import Field
 from pydep.io.wepp import read_cli
 from pyiem import iemre
-from pyiem.database import get_sqlalchemy_conn
+from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.util import logger
 from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
-from sqlalchemy import text
 
 LOG = logger()
 
@@ -36,7 +35,7 @@ def log_request(environ: dict, fn: str, distance: float):
     """Log this request"""
     with get_sqlalchemy_conn("idep") as conn:
         conn.execute(
-            text("""
+            sql_helper("""
     INSERT into clifile_requests(client_addr, geom, climate_file_id,
     distance_degrees) VALUES (:addr, ST_Point(:lon, :lat, 4326),
     (select id from climate_files where scenario = 0 and filepath = :fn),
@@ -57,7 +56,7 @@ def find_closest_file(lon: float, lat: float) -> tuple:
     """Find the closest climate file to the given point."""
     with get_sqlalchemy_conn("idep") as conn:
         res = conn.execute(
-            text("""
+            sql_helper("""
     select filepath, st_distance(geom, ST_Point(:lon, :lat, 4326)) as distance
     from climate_files where scenario = 0 and
     ST_Contains(ST_MakeEnvelope(:west, :south, :east, :north, 4326), geom)

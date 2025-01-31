@@ -5,9 +5,8 @@ from io import StringIO
 
 import pandas as pd
 from pydantic import Field
-from pyiem.database import get_sqlalchemy_conn
+from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
-from sqlalchemy import text
 
 
 class Schema(CGIModel):
@@ -32,7 +31,7 @@ def gen(huc12s, sdate, edate):
     with get_sqlalchemy_conn("idep") as conn:
         # Check that we have data for this date!
         df = pd.read_sql(
-            text(
+            sql_helper(
                 """
             SELECT huc_12,
             sum(avg_loss) * 4.463 as avg_loss_ton_acre,

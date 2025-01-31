@@ -5,11 +5,10 @@ from datetime import date
 import pandas as pd
 import simplejson as json
 from pydantic import Field
-from pyiem.database import get_sqlalchemy_conn
+from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.dep import RAMPS
 from pyiem.util import utc
 from pyiem.webutil import CGIModel, iemapp
-from sqlalchemy import text
 
 
 class Schema(CGIModel):
@@ -29,7 +28,7 @@ def do(ts, ts2):
     """Do work"""
     with get_sqlalchemy_conn("idep") as conn:
         df = pd.read_sql(
-            text("""
+            sql_helper("""
         with data as (
             SELECT huc_12,
             sum(coalesce(avg_loss, 0)) * 4.463 as avg_loss,
