@@ -8,9 +8,8 @@ import zipfile
 
 from geopandas import GeoDataFrame
 from pydantic import Field
-from pyiem.database import get_sqlalchemy_conn
+from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
-from sqlalchemy import text
 
 PRJFILE = "/opt/iem/data/gis/meta/5070.prj"
 
@@ -39,8 +38,8 @@ def workflow(start_response, dt, dt2, states, conv):
         statelimit = " and (" + " or ".join(_s) + " ) "
     with get_sqlalchemy_conn("idep") as conn:
         df = GeoDataFrame.from_postgis(
-            text(
-                f"""
+            sql_helper(
+                """
             with data as (
                 SELECT simple_geom, huc_12, name, dominant_tillage,
                 average_slope_ratio, s.dep_version_label as version
@@ -64,7 +63,9 @@ def workflow(start_response, dt, dt2, states, conv):
             coalesce(o.avg_delivery, 0) as deli_kgm,
             d.version
             from data d LEFT JOIN obs o ON (d.huc_12 = o.huc_12)
-        """
+        """,
+                statelimit=statelimit,
+                dextra=dextra,
             ),
             conn,
             params=params,

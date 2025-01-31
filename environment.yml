@@ -1,4 +1,12 @@
 dependencies:
+  - gdal
+  - pandas
+  # database
+  - postgresql
+  - psycopg
   - pydantic
-  - pyiem >=1.20.0
+  - pygrib
+  # sigh, need github main build
+  # - pyiem >=1.20.0
   - pytest
+  - rasterio

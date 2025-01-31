@@ -3,9 +3,8 @@
 import json
 
 from pydantic import Field
-from pyiem.database import get_sqlalchemy_conn
+from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.webutil import CGIModel, iemapp
-from sqlalchemy import text
 
 
 class Schema(CGIModel):
@@ -19,7 +18,7 @@ def search(q):
     d = dict(results=[])
     with get_sqlalchemy_conn("idep") as conn:
         res = conn.execute(
-            text(
+            sql_helper(
                 "SELECT huc_12, name from huc12 "
                 "WHERE name ~* :name and scenario = 0 LIMIT 10"
             ),

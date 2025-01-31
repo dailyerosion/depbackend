@@ -5,11 +5,10 @@ import datetime
 # needed for Decimal formatting to work
 import simplejson as json
 from pydantic import Field
-from pyiem.database import get_sqlalchemy_conn
+from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.dep import RAMPS
 from pyiem.util import logger, utc
 from pyiem.webutil import CGIModel, iemapp
-from sqlalchemy import text
 
 LOG = logger()
 
@@ -42,11 +41,12 @@ def do(ts, ts2, domain):
     with get_sqlalchemy_conn("idep") as conn:
         # Get version label
         res = conn.execute(
-            text("SELECT dep_version_label from scenarios where id = 0")
+            sql_helper("SELECT dep_version_label from scenarios where id = 0")
         )
         dep_version_label = res.fetchone()[0]
         res = conn.execute(
-            text(f"""
+            sql_helper(
+                """
             WITH data as (
                 SELECT ST_asGeoJson(ST_Transform(simple_geom, 4326), 4) as g,
                 huc_12
@@ -66,7 +66,10 @@ def do(ts, ts2, domain):
             coalesce(round(o.avg_delivery::numeric, 2), 0),
             coalesce(round(o.avg_runoff::numeric, 2), 0)
             from data d LEFT JOIN obs o ON (d.huc_12 = o.huc_12)
-        """),
+        """,
+                domainextra=domainextra,
+                dextra=dextra,
+            ),
             params,
         )
         data = {
