@@ -1,1 +1,4 @@
-from depbackend.auto.version import application  # skipcq
+from depbackend.auto.version import application
+
+# appease linters
+_ = application

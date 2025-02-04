@@ -1,1 +1,4 @@
-from depbackend.dl.climatefile import application  # skipcq
+from depbackend.dl.climatefile import application
+
+# appease linters
+_ = application

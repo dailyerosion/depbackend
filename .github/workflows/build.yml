@@ -80,7 +80,7 @@ jobs:
       run: |
         set -e
         export PYTHONPATH=/opt/depbackend/pylib
-        python -m pytest --cov=depbackend -v tests/test_website_requests.py
+        python -m pytest --cov=depbackend -v tests
         python -m coverage xml
 
     - name: Upload to codecov

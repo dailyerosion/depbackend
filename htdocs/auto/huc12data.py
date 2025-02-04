@@ -1,1 +1,4 @@
-from depbackend.auto.huc12data import application  # skipcq
+from depbackend.auto.huc12data import application
+
+# appease linters
+_ = application
