@@ -24,6 +24,7 @@ V2NAME = {
     "avg_delivery": "Hillslope Soil Loss",
     "avg_runoff": "Runoff",
     "dt": "Dominant Tillage Code",
+    "slp": "Average Slope Ratio",
 }
 V2MULTI = {
     "avg_loss": 4.463,
@@ -31,6 +32,7 @@ V2MULTI = {
     "avg_delivery": 4.463,
     "avg_runoff": 1.0 / 25.4,
     "dt": 1,
+    "slp": 1,
 }
 V2UNITS = {
     "avg_loss": "tons/acre",
@@ -38,6 +40,7 @@ V2UNITS = {
     "avg_delivery": "tons/acre",
     "avg_runoff": "inches",
     "dt": "categorical",
+    "slp": "ratio",
 }
 
 
@@ -171,12 +174,8 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
         # c = ['#ffffa6', '#9cf26d', '#76cc94', '#6399ba', '#5558a1']
         cmap = james()
     # suggested for detachment
-    elif v in ["avg_loss", "dt"]:
+    else:
         # c =['#cbe3bb', '#c4ff4d', '#ffff4d', '#ffc44d', '#ff4d4d', '#c34dee']
-        cmap = dep_erosion()
-    # suggested for delivery
-    elif v in ["avg_delivery"]:
-        # c =['#ffffd2', '#ffff4d', '#ffe0a5', '#eeb74d', '#ba7c57', '#96504d']
         cmap = dep_erosion()
 
     title = f"for {ts:%-d %B %Y}"
@@ -231,15 +230,17 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
         huclimiter += " and i.states ~* 'IA' "
     if environ["mn"]:
         huclimiter += " and i.states ~* 'MN' "
-    if v == "dt":
+    if v in ["dt", "slp"]:
+        colname = "dominant_tillage" if v == "dt" else "average_slope_ratio"
         df = gpd.read_postgis(
             sql_helper(
                 """
         SELECT simple_geom as geom,
-        dominant_tillage as data
+        {colname} as data
         from huc12 i WHERE scenario = :huc12_scenario {huclimiter}
         """,
                 huclimiter=huclimiter,
+                colname=colname,
             ),
             conn,
             params=params,
@@ -319,6 +320,8 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
         bins[0] = 0.01
     if v == "dt":
         bins = range(1, 8)
+    if v == "slp":
+        bins = [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.5]
     norm = mpcolors.BoundaryNorm(bins, cmap.N)
     for _, row in df.to_crs(mp.panels[0].crs).iterrows():
         p = Polygon(
@@ -371,7 +374,7 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
             (0.201, 0.907),
             proportion,
             0.016,
-            color=cmap(norm([avgval]))[0],
+            color=cmap(norm(avgval)),
             zorder=50,
             transform=fig.transFigure,
             figure=fig,
