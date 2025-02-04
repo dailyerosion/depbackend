@@ -68,6 +68,10 @@ jobs:
         set -e
         sudo ln -s `pwd` /opt/depbackend
         sudo cp config/apache-vhost-ci.conf /etc/apache2/sites-enabled/depbackend.conf
+
+        # ci_tooling places a mod_wsgi conf with startup disabled, we enable it
+        sudo sed -i 's/# WSGIImportScript/WSGIImportScript/' /etc/apache2/sites-enabled/mod_wsgi.conf
+
         sudo systemctl restart apache2
 
     #- name: Debug with SSH
@@ -75,7 +79,15 @@ jobs:
     - name: Run Website Request Tests
       run: |
         set -e
-        python -m pytest -v tests/test_website_requests.py
+        export PYTHONPATH=/opt/depbackend/pylib
+        python -m pytest --cov=depbackend -v tests/test_website_requests.py
+        python -m coverage xml
+
+    - name: Upload to codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: coverage.xml
 
     - name: View Apache Logs
       if: failure()
