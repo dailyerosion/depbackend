@@ -8,6 +8,7 @@ import numpy as np
 import seaborn as sns
 from pydantic import Field
 from pydep.io.wepp import read_slp
+from pyiem.exceptions import NoDataFound
 from pyiem.plot.use_agg import plt
 from pyiem.webutil import CGIModel, iemapp
 
@@ -28,7 +29,10 @@ class Schema(CGIModel):
 
 def make_plot(huc12, scenario):
     """Make the map"""
-    os.chdir("/i/%s/slp/%s/%s" % (scenario, huc12[:8], huc12[8:]))
+    mydir = f"/i/{scenario}/slp/{huc12[:8]}/{huc12[8:]}"
+    if not os.path.isdir(mydir):
+        raise NoDataFound("No data found for this scenario")
+    os.chdir(mydir)
     res = []
     for fn in glob.glob("*.slp"):
         try:
