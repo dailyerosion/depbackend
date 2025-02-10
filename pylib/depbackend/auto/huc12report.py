@@ -4,7 +4,6 @@ import calendar
 from datetime import datetime
 from io import BytesIO
 
-import httpx
 import pandas as pd
 from metpy.units import units
 from pydantic import Field
