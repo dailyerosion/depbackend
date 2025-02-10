@@ -2,8 +2,8 @@
 
 import os
 
+import httpx
 import pytest
-import requests
 
 SERVICE = "http://depbackend.local"
 
@@ -24,6 +24,6 @@ def get_uris():
 @pytest.mark.parametrize("uri", get_uris())
 def test_uri(uri):
     """Test a URI."""
-    res = requests.get(f"{SERVICE}{uri}", timeout=60)
+    res = httpx.get(f"{SERVICE}{uri}", timeout=60)
     # HTTP 400 should be known failures being gracefully handled
     assert res.status_code in [200, 400]

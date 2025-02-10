@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from pydantic import Field
 from pyiem.database import get_sqlalchemy_conn
+from pyiem.exceptions import NoDataFound
 from pyiem.plot import figure
 from pyiem.webutil import CGIModel, iemapp
 
@@ -50,6 +51,8 @@ def make_plot(huc12, scenario):
             params=(huc12, scenario),
             index_col=None,
         )
+    if df.empty:
+        raise NoDataFound("No data found for HUC12")
     gdf = df.groupby("mo").mean()
     fig = figure(
         logo="dep",

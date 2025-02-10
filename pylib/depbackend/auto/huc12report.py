@@ -4,8 +4,8 @@ import calendar
 from datetime import datetime
 from io import BytesIO
 
+import httpx
 import pandas as pd
-import requests
 from metpy.units import units
 from pydantic import Field
 from pyiem.database import get_dbconn, get_sqlalchemy_conn
@@ -22,12 +22,12 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
+from depbackend.auto.huc12_slopes import make_plot
+from depbackend.auto.mapper import make_overviewmap
 
 PAGE_WIDTH = letter[0]
 PAGE_HEIGHT = letter[1]
 GENTIME = datetime.now().strftime("%B %-d %Y")
-HOST = "http://depbackend.local"
-MAPPER = f"{HOST}/auto/mapper.py"
 INTROTEXT = (
     "The Daily Erosion Project generates estimates of sheet and rill "
     "erosion.  This PDF summarizes our model results.  All results should be "
@@ -140,9 +140,7 @@ def generate_run_metadata(huc12):
                 [
                     [
                         Image(
-                            get_image_bytes(
-                                f"{HOST}/auto/huc12_slopes.py?huc12={huc12}"
-                            ),
+                            make_plot(huc12, 0),
                             width=3.6 * inch,
                             height=2.4 * inch,
                         ),
@@ -368,14 +366,6 @@ def draw_header(canvas, doc, huc12):
     canvas.restoreState()
 
 
-def get_image_bytes(uri):
-    """Return BytesIO object with web content."""
-    req = requests.get(uri)
-    image = BytesIO(req.content)
-    image.seek(0)
-    return image
-
-
 @iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """See how we are called"""
@@ -388,30 +378,29 @@ def application(environ, start_response):
     story.append(Paragraph(INTROTEXT, styles["Normal"]))
     story.append(Spacer(inch, inch * 0.25))
     story.append(Paragraph("Geographic Location", styles["Heading1"]))
+    image1 = Image(
+        make_overviewmap({"overview": 1, "huc": huc12, "zoom": 250}),
+        width=3.6 * inch,
+        height=2.4 * inch,
+    )
+    image2 = Image(
+        make_overviewmap({"overview": 1, "huc": huc12, "zoom": 11}),
+        width=3.6 * inch,
+        height=2.4 * inch,
+    )
+
     story.append(
         Table(
             [
                 [
                     [
-                        Image(
-                            get_image_bytes(
-                                f"{MAPPER}?overview=1&huc={huc12}&zoom=250"
-                            ),
-                            width=3.6 * inch,
-                            height=2.4 * inch,
-                        ),
+                        image1,
                         Paragraph(
                             LOCALIZATION["F1"][int(ishuc12)], styles["Normal"]
                         ),
                     ],
                     [
-                        Image(
-                            get_image_bytes(
-                                f"{MAPPER}?overview=1&huc={huc12}&zoom=11"
-                            ),
-                            width=3.6 * inch,
-                            height=2.4 * inch,
-                        ),
+                        image2,
                         Paragraph(
                             LOCALIZATION["F2"][int(ishuc12)], styles["Normal"]
                         ),

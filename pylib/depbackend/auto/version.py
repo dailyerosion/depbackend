@@ -5,6 +5,7 @@ from io import StringIO
 import pandas as pd
 from pydantic import Field
 from pyiem.database import get_sqlalchemy_conn, sql_helper
+from pyiem.exceptions import NoDataFound
 from pyiem.webutil import CGIModel, iemapp
 
 
@@ -33,6 +34,8 @@ def gen(scenario):
                 "scenario": scenario,
             },
         )
+    if df.empty:
+        raise NoDataFound("No data found for scenario")
     sio = StringIO()
     df.iloc[0].to_json(sio)
     return sio.getvalue()
