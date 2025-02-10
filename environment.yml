@@ -1,5 +1,6 @@
 dependencies:
   - gdal
+  - httpx
   - pandas
   # database
   - postgresql
@@ -11,3 +12,7 @@ dependencies:
   - pytest
   - pytest-cov
   - rasterio
+  - reportlab
+  - seaborn
+  # For testing
+  - werkzeug

@@ -92,6 +92,8 @@ def make_overviewmap(environ):
             params=params,
             index_col="huc_12",
         )
+    if df.empty:
+        raise NoDataFound("No Data Found for this scenario and date")
     minx, miny, maxx, maxy = df["geom"].total_bounds
     buf = environ["zoom"] * 1000.0  # 10km
     hucname = "" if huc not in df.index else df.at[huc, "name"]
@@ -293,6 +295,8 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
             params=params,
             geom_col="geom",
         )
+    if df.empty:
+        raise NoDataFound("No Data Found for this scenario and date")
     minx, miny, maxx, maxy = df["geom"].total_bounds
     buf = 10000.0  # 10km
     mp = MapPlot(

@@ -1,1 +1,2 @@
 git+https://github.com/akrherz/pyIEM.git
+git+https://github.com/dailyerosion/dep.git

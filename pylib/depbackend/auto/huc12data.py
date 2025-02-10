@@ -70,12 +70,13 @@ def do(ts, ts2):
         avg_delivery=myramp,
         avg_runoff=myramp,
     )
-    res["max_values"] = dict(
-        avg_loss=df["avg_loss"].max(),
-        qc_precip=df["qc_precip"].max(),
-        avg_delivery=df["avg_delivery"].max(),
-        avg_runoff=df["avg_runoff"].max(),
-    )
+    if not df.empty:
+        res["max_values"] = dict(
+            avg_loss=df["avg_loss"].max(),
+            qc_precip=df["qc_precip"].max(),
+            avg_delivery=df["avg_delivery"].max(),
+            avg_runoff=df["avg_runoff"].max(),
+        )
     return json.dumps(res)
 
 
