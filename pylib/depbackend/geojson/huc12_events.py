@@ -1,6 +1,5 @@
 """GeoJSON service for HUC12 data"""
 
-import datetime
 import json
 from io import BytesIO
 
