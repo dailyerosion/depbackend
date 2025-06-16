@@ -7,6 +7,7 @@ from io import BytesIO
 import pandas as pd
 from pydantic import Field
 from pyiem.database import get_sqlalchemy_conn
+from pyiem.util import utc
 from pyiem.webutil import CGIModel, iemapp
 from pymemcache.client import Client
 
@@ -27,9 +28,9 @@ class Schema(CGIModel):
     format: str = Field("json", description="json or xlsx")
 
 
-def do(huc12, mode, fmt):
+def do(huc12: str, mode: str, fmt: str):
     """Do work"""
-    utcnow = datetime.datetime.utcnow()
+    utcnow = utc()
     if mode == "daily":
         with get_sqlalchemy_conn("idep") as conn:
             df = pd.read_sql(
@@ -74,9 +75,7 @@ def do(huc12, mode, fmt):
                 params=(huc12,),
                 index_col=None,
             )
-            df["valid"] = pd.to_datetime(
-                {"year": df["yr"], "month": 1, "day": 1}
-            )
+            df["valid"] = pd.to_datetime(df["yr"].astype(str) + "-01-01")
     if fmt == "xlsx":
         bio = BytesIO()
         # pylint: disable=abstract-class-instantiated

@@ -13,9 +13,10 @@ import pandas as pd
 from pydantic import Field
 from pydep.io.wepp import read_cli
 from pyiem import iemre
-from pyiem.database import get_sqlalchemy_conn, sql_helper
+from pyiem.database import sql_helper, with_sqlalchemy_conn
 from pyiem.util import logger
 from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
+from sqlalchemy.engine import Connection
 
 LOG = logger()
 
@@ -31,50 +32,54 @@ class Schema(CGIModel):
     )
 
 
-def log_request(environ: dict, fn: str, distance: float):
+@with_sqlalchemy_conn("idep")
+def log_request(
+    environ: dict, fn: str, distance: float, conn: Connection | None = None
+):
     """Log this request"""
-    with get_sqlalchemy_conn("idep") as conn:
-        conn.execute(
-            sql_helper("""
-    INSERT into clifile_requests(client_addr, geom, climate_file_id,
-    distance_degrees) VALUES (:addr, ST_Point(:lon, :lat, 4326),
-    (select id from climate_files where scenario = 0 and filepath = :fn),
-    :dist)
-    """),
-            {
-                "lon": environ["lon"],
-                "lat": environ["lat"],
-                "fn": fn,
-                "dist": distance,
-                "addr": environ.get("REMOTE_ADDR"),
-            },
-        )
-        conn.commit()
+    conn.execute(
+        sql_helper("""
+INSERT into clifile_requests(client_addr, geom, climate_file_id,
+distance_degrees) VALUES (:addr, ST_Point(:lon, :lat, 4326),
+(select id from climate_files where scenario = 0 and filepath = :fn),
+:dist)
+"""),
+        {
+            "lon": environ["lon"],
+            "lat": environ["lat"],
+            "fn": fn,
+            "dist": distance,
+            "addr": environ.get("REMOTE_ADDR"),
+        },
+    )
+    conn.commit()
 
 
-def find_closest_file(lon: float, lat: float) -> tuple:
+@with_sqlalchemy_conn("idep")
+def find_closest_file(
+    lon: float, lat: float, conn: Connection | None = None
+) -> tuple:
     """Find the closest climate file to the given point."""
-    with get_sqlalchemy_conn("idep") as conn:
-        res = conn.execute(
-            sql_helper("""
-    select filepath, st_distance(geom, ST_Point(:lon, :lat, 4326)) as distance
-    from climate_files where scenario = 0 and
-    ST_Contains(ST_MakeEnvelope(:west, :south, :east, :north, 4326), geom)
-    order by geom <-> ST_Point(:lon, :lat, 4326) asc limit 1
-                 """),
-            {
-                "lon": lon,
-                "lat": lat,
-                "west": lon - 1,
-                "south": lat - 1,
-                "east": lon + 1,
-                "north": lat + 1,
-            },
-        )
-        if res.rowcount == 0:
-            return None, None
-        row = res.first()
-        return row[0], row[1]
+    res = conn.execute(
+        sql_helper("""
+select filepath, st_distance(geom, ST_Point(:lon, :lat, 4326)) as distance
+from climate_files where scenario = 0 and
+ST_Contains(ST_MakeEnvelope(:west, :south, :east, :north, 4326), geom)
+order by geom <-> ST_Point(:lon, :lat, 4326) asc limit 1
+                """),
+        {
+            "lon": lon,
+            "lat": lat,
+            "west": lon - 1,
+            "south": lat - 1,
+            "east": lon + 1,
+            "north": lat + 1,
+        },
+    )
+    if res.rowcount == 0:
+        return None, None
+    row = res.first()
+    return row[0], row[1]
 
 
 @iemapp(help=__doc__, schema=Schema)
