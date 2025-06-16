@@ -1,5 +1,7 @@
-"""
-Called from DEP map application
+""".. title:: Download IDEP Shapefile
+
+Emits a zip file containing a shapefile of the IDEP HUC12
+
 """
 
 import datetime

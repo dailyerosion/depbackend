@@ -91,7 +91,7 @@ def make_overviewmap(environ):
             geom_col="geom",
             params=params,
             index_col="huc_12",
-        )
+        )  # type: ignore
     if df.empty:
         raise NoDataFound("No Data Found for this scenario and date")
     minx, miny, maxx, maxy = df["geom"].total_bounds
@@ -220,14 +220,14 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
         "ts2": ts2,
         "dbcol": V2MULTI[v],
     }
-    if huc is None:
-        huclimiter = ""
-    elif len(huc) == 8:
-        huclimiter = " and substr(i.huc_12, 1, 8) = :huc8 "
-        params["huc8"] = huc
-    elif len(huc) == 12:
-        huclimiter = " and i.huc_12 = :huc12 "
-        params["huc12"] = huc
+    huclimiter = ""
+    if huc is not None:
+        if len(huc) == 8:
+            huclimiter = " and substr(i.huc_12, 1, 8) = :huc8 "
+            params["huc8"] = huc
+        elif len(huc) == 12:
+            huclimiter = " and i.huc_12 = :huc12 "
+            params["huc12"] = huc
     if environ["iowa"]:
         huclimiter += " and i.states ~* 'IA' "
     if environ["mn"]:
@@ -247,7 +247,7 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
             conn,
             params=params,
             geom_col="geom",
-        )
+        )  # type: ignore
     elif environ["averaged"]:
         df = gpd.read_postgis(
             sql_helper(
@@ -271,7 +271,7 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
             conn,
             params=params,
             geom_col="geom",
-        )
+        )  # type: ignore
 
     else:
         df = gpd.read_postgis(
@@ -294,7 +294,7 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
             conn,
             params=params,
             geom_col="geom",
-        )
+        )  # type: ignore
     if df.empty:
         raise NoDataFound("No Data Found for this scenario and date")
     minx, miny, maxx, maxy = df["geom"].total_bounds
@@ -351,6 +351,7 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
         clevlabels=lbl,
         spacing="uniform",
     )
+    avgval = None
     if environ["progressbar"]:
         fig = plt.gcf()
         avgval = df["data"].mean()
