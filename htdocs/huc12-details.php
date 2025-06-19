@@ -43,11 +43,11 @@ echo <<<EOF
 <input type="text" value="$huc_12" name="huc_12" id="huc_12" size="12"/>
 <br />&nbsp;
 <p>
-<button onclick="javascript: viewEvents('{$huc_12}', 'daily');"
+<button data-action="view-events" data-huc12="{$huc_12}" data-period="daily"
  class="btn btn-sm btn-primary" type="button" data-bs-toggle="modal"
  data-bs-target="#eventsModal">
  <i class="fa fa-th-list"></i> View Daily Data</button>
-<button onclick="javascript: viewEvents('{$huc_12}', 'yearly');"
+<button data-action="view-events" data-huc12="{$huc_12}" data-period="yearly"
  class="btn btn-sm btn-primary" type="button" data-bs-toggle="modal"
  data-bs-target="#eventsModal">
  <i class="fa fa-th-list"></i> View Yearly Data</button>
@@ -114,7 +114,7 @@ if (pg_num_rows($rs) == 0) {
             echo "<tr>";
         }
         echo sprintf(
-            "<td><span class=\"badge text-bg-secondary\">%s</span> <a href='javascript:setDate(%s,%s,%s);'>%s</a></td>",
+            "<td><span class=\"badge text-bg-secondary\">%s</span> <a href='#' data-action='set-date' data-year='%s' data-month='%s' data-day='%s'>%s</a></td>",
             $i + 1,
             date("Y", $ts),
             date("m", $ts),
