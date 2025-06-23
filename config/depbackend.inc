@@ -11,8 +11,8 @@ Include /opt/iemwebfarm/config/vhost_common.conf
   	Options Indexes MultiViews
   </Directory>
 
-  Alias /usage/ "/mesonet/share/usage/idep.agron.iastate.edu/"
-  <Directory "/mesonet/share/usage/idep.agron.iastate.edu/">
+  Alias /usage/ "/mesonet/share/usage/depbackend/"
+  <Directory "/mesonet/share/usage/depbackend/">
     Options Indexes MultiViews
     AllowOverride None
     Order allow,deny
