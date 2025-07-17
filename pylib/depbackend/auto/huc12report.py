@@ -7,7 +7,11 @@ from io import BytesIO
 import pandas as pd
 from metpy.units import units
 from pydantic import Field
-from pyiem.database import get_dbconn, get_sqlalchemy_conn
+from pyiem.database import (
+    get_sqlalchemy_conn,
+    sql_helper,
+    with_sqlalchemy_conn,
+)
 from pyiem.webutil import CGIModel, iemapp
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
@@ -21,6 +25,7 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
+from sqlalchemy.engine import Connection
 from depbackend.auto.huc12_slopes import make_plot
 from depbackend.auto.mapper import make_overviewmap
 
@@ -67,22 +72,21 @@ def m2f(val):
     return ((val * units("m")).to(units("feet"))).m
 
 
-def generate_run_metadata(huc12):
+@with_sqlalchemy_conn("idep")
+def generate_run_metadata(huc12: str, conn: Connection | None = None):
     """Information about DEP modelling of this huc12."""
     styles = getSampleStyleSheet()
     res = []
-    pgconn = get_dbconn("idep")
     # Get the number of runs
-    cursor = pgconn.cursor()
-    cursor.execute(
-        """
+    rs = conn.execute(
+        sql_helper("""
     select count(*), min(ST_Length(geom)), avg(ST_Length(geom)),
     max(ST_Length(geom)) from flowpaths
-    where huc_12 = %s and scenario = 0
-    """,
-        (huc12,),
+    where huc_12 = :huc12 and scenario = 0
+    """),
+        {"huc12": huc12},
     )
-    row = cursor.fetchone()
+    row = rs.mappings().fetchone()
     res.append(
         Paragraph(
             (
@@ -93,13 +97,13 @@ def generate_run_metadata(huc12):
                 "(%.1f feet)."
             )
             % (
-                row[0],
-                row[1],
-                row[3],
-                m2f(row[1]),
-                m2f(row[3]),
-                row[2],
-                m2f(row[2]),
+                row["count"],
+                row["min"],
+                row["max"],
+                m2f(row["min"]),
+                m2f(row["max"]),
+                row["avg"],
+                m2f(row["avg"]),
             ),
             styles["Normal"],
         )
@@ -108,17 +112,16 @@ def generate_run_metadata(huc12):
     # Something about managements and crops
     rows = [["Year", "Corn", "Soybean", "Pasture", "Other"]]
     for year in range(2016, 2023):
-        with get_sqlalchemy_conn("idep") as conn:
-            df = pd.read_sql(
-                """
-            select substr(landuse, %s, 1) as datum, count(*) from
-            flowpath_ofes o JOIN flowpaths f on (o.flowpath = f.fid)
-            WHERE f.huc_12 = %s and f.scenario = 0 GROUP by datum
-            """,
-                conn,
-                params=(year - 2007 + 1, huc12),
-                index_col="datum",
-            )
+        df = pd.read_sql(
+            sql_helper("""
+        select substr(landuse, :offset, 1) as datum, count(*) from
+        flowpath_ofes o JOIN flowpaths f on (o.flowpath = f.fid)
+        WHERE f.huc_12 = :huc12 and f.scenario = 0 GROUP by datum
+        """),
+            conn,
+            params={"offset": year - 2007 + 1, "huc12": huc12},
+            index_col="datum",
+        )
         total = df["count"].sum()
         leftover = total
         rows.append([year])

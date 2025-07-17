@@ -66,7 +66,7 @@ class Schema(CGIModel):
     mn: bool = Field(False, description="Limit to Minnesota")
 
 
-def make_overviewmap(environ):
+def make_overviewmap(environ: dict):
     """Draw a pretty map of just the HUC."""
     huc = environ["huc"]
     plt.close()
@@ -141,7 +141,7 @@ def make_overviewmap(environ):
     plt.savefig(ram, format="png", dpi=100)
     plt.close()
     ram.seek(0)
-    return ram.read()
+    return ram
 
 
 def label_scenario(ax, scenario, conn):
@@ -404,7 +404,7 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
     plt.savefig(ram, format="png", dpi=environ["dpi"])
     plt.close()
     ram.seek(0)
-    return ram.read()
+    return ram
 
 
 def get_ts_ts2(environ):
@@ -448,9 +448,9 @@ def application(environ, start_response):
     huc = environ["huc"]
     ts, ts2 = get_ts_ts2(environ)
     if environ["overview"] and huc is not None:
-        res = make_overviewmap(environ)
+        res = make_overviewmap(environ).read()
     else:
         with get_sqlalchemy_conn("idep") as conn:
-            res = make_map(conn, huc, ts, ts2, scenario, v, environ)
+            res = make_map(conn, huc, ts, ts2, scenario, v, environ).read()
 
     return res

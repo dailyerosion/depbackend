@@ -27,7 +27,7 @@ class Schema(CGIModel):
     )
 
 
-def make_plot(huc12, scenario):
+def make_plot(huc12: str, scenario: int):
     """Make the map"""
     mydir = f"/i/{scenario}/slp/{huc12[:8]}/{huc12[8:]}"
     if not os.path.isdir(mydir):
@@ -65,11 +65,11 @@ def make_plot(huc12, scenario):
     plt.gcf().set_size_inches(3.6, 2.4)
     plt.savefig(ram, format="png", dpi=100)
     ram.seek(0)
-    return ram.read()
+    return ram
 
 
 @iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """Do something fun"""
     start_response("200 OK", [("Content-type", "image/png")])
-    return [make_plot(environ["huc12"], environ["scenario"])]
+    return [make_plot(environ["huc12"], environ["scenario"]).read()]
