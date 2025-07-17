@@ -103,11 +103,11 @@ def make_plot(huc12, scenario):
     ram = BytesIO()
     fig.savefig(ram, format="png", dpi=100)
     ram.seek(0)
-    return ram.read()
+    return ram
 
 
 @iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """Do something fun"""
     start_response("200 OK", [("Content-type", "image/png")])
-    return [make_plot(environ["huc12"], environ["scenario"])]
+    return [make_plot(environ["huc12"], environ["scenario"]).read()]
