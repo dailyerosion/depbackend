@@ -13,7 +13,6 @@ from pyiem.dep import RAMPS
 from pyiem.exceptions import NoDataFound
 from pyiem.plot.colormaps import dep_erosion, james
 from pyiem.plot.geoplot import Z_OVERLAY2, MapPlot
-from pyiem.plot.use_agg import plt
 from pyiem.plot.util import pretty_bins
 from pyiem.reference import EPSG
 from pyiem.webutil import CGIModel, iemapp
@@ -69,7 +68,6 @@ class Schema(CGIModel):
 def make_overviewmap(environ: dict):
     """Draw a pretty map of just the HUC."""
     huc = environ["huc"]
-    plt.close()
     projection = EPSG[5070]
     params = {}
     huclimiter = ""
@@ -138,8 +136,7 @@ def make_overviewmap(environ: dict):
         m.drawcounties()
         m.drawcities()
     ram = BytesIO()
-    plt.savefig(ram, format="png", dpi=100)
-    plt.close()
+    m.fig.savefig(ram, format="png", dpi=100)
     ram.seek(0)
     return ram
 
@@ -170,7 +167,6 @@ def label_scenario(ax, scenario, conn):
 def make_map(conn, huc, ts, ts2, scenario, v, environ):
     """Make the map"""
     projection = EPSG[5070]
-    plt.close()
     # suggested for runoff and precip
     if v in ["qc_precip", "avg_runoff"]:
         # c = ['#ffffa6', '#9cf26d', '#76cc94', '#6399ba', '#5558a1']
@@ -353,10 +349,9 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
     )
     avgval = None
     if environ["progressbar"]:
-        fig = plt.gcf()
         avgval = df["data"].mean()
         _ll = ts.year if environ["averaged"] else "Avg"
-        fig.text(
+        mp.fig.text(
             0.06,
             0.905,
             f"{_ll}: {avgval:4.1f} T/a",
@@ -371,20 +366,20 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
             0.02,
             color="k",
             zorder=40,
-            transform=fig.transFigure,
-            figure=fig,
+            transform=mp.fig.transFigure,
+            figure=mp.fig,
         )
-        fig.patches.append(rect1)
+        mp.fig.patches.append(rect1)
         rect2 = Rectangle(
             (0.201, 0.907),
             proportion,
             0.016,
             color=cmap(norm(avgval)),
             zorder=50,
-            transform=fig.transFigure,
-            figure=fig,
+            transform=mp.fig.transFigure,
+            figure=mp.fig,
         )
-        fig.patches.append(rect2)
+        mp.fig.patches.append(rect2)
     if environ["cruse"]:
         # Crude conversion of T/a to mm depth
         depth = avgval / 5.0
@@ -401,8 +396,7 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
             color="white",
         )
     ram = BytesIO()
-    plt.savefig(ram, format="png", dpi=environ["dpi"])
-    plt.close()
+    mp.fig.savefig(ram, format="png", dpi=environ["dpi"])
     ram.seek(0)
     return ram
 

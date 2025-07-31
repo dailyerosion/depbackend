@@ -9,7 +9,6 @@ import seaborn as sns
 from pydantic import Field
 from pydep.io.wepp import read_slp
 from pyiem.exceptions import NoDataFound
-from pyiem.plot.use_agg import plt
 from pyiem.webutil import CGIModel, iemapp
 
 
@@ -62,8 +61,8 @@ def make_plot(huc12: str, scenario: int):
     )
 
     ram = BytesIO()
-    plt.gcf().set_size_inches(3.6, 2.4)
-    plt.savefig(ram, format="png", dpi=100)
+    g.figure.set_size_inches(3.6, 2.4)
+    g.figure.savefig(ram, format="png", dpi=100)
     ram.seek(0)
     return ram
 
