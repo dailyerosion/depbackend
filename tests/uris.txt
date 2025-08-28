@@ -1,1 +1,4 @@
 /auto/mapper.py
+/dl/climatefile.py?lon=10&lat=30
+/dl/climatefile.py?lon=-97.5&lat=35.5&fmt=ntt
+/dl/climatefile.py?lon=-0.5&lat=89

@@ -4,6 +4,11 @@ This service provides a download of a climate file for a given latitude and
 longitude point.  The service will search for the nearest climate file to the
 requested point and provide it for download.
 
+Changelog
+---------
+
+- 2025-08-28: Emit climate files for the Europe domain when requested.
+
 """
 
 import os
@@ -12,8 +17,9 @@ from io import StringIO
 import pandas as pd
 from pydantic import Field
 from pydep.io.wepp import read_cli
-from pyiem import iemre
-from pyiem.database import sql_helper, with_sqlalchemy_conn
+from pyiem.database import get_sqlalchemy_conn, sql_helper
+from pyiem.exceptions import NoDataFound
+from pyiem.iemre import get_domain
 from pyiem.util import logger
 from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
 from sqlalchemy.engine import Connection
@@ -32,10 +38,7 @@ class Schema(CGIModel):
     )
 
 
-@with_sqlalchemy_conn("idep")
-def log_request(
-    environ: dict, fn: str, distance: float, conn: Connection | None = None
-):
+def log_request(conn: Connection, environ: dict, fn: str, distance: float):
     """Log this request"""
     conn.execute(
         sql_helper("""
@@ -55,10 +58,7 @@ distance_degrees) VALUES (:addr, ST_Point(:lon, :lat, 4326),
     conn.commit()
 
 
-@with_sqlalchemy_conn("idep")
-def find_closest_file(
-    lon: float, lat: float, conn: Connection | None = None
-) -> tuple:
+def find_closest_file(conn: Connection, lon: float, lat: float) -> tuple:
     """Find the closest climate file to the given point."""
     res = conn.execute(
         sql_helper("""
@@ -88,31 +88,20 @@ def application(environ, start_response):
     fmt = environ["format"]
     lon = environ["lon"]
     lat = environ["lat"]
-    dom = iemre.DOMAINS[""]
-    if (
-        lon < dom["west"]
-        or lon > dom["east"]
-        or lat < dom["south"]
-        or lat > dom["north"]
-    ):
-        headers = [("Content-type", "text/plain")]
-        start_response("500 Internal Server Error", headers)
-        errmsg = (
-            f"Requested point outside of bounds {dom['west']},{dom['south']} "
-            f"{dom['east']},{dom['north']}!"
-        )
-        return [errmsg.encode("ascii")]
-    fn, distance = find_closest_file(lon, lat)
-    if fn is None:
-        headers = [("Content-type", "text/plain")]
-        start_response("500 Internal Server Error", headers)
-        return [b"Failed to locate a climate file in vicinity of your point."]
-    if fmt == "wepp":
-        # Log this request
-        try:
-            log_request(environ, fn, distance)
-        except Exception as exp:
-            LOG.exception(exp)
+    domain = get_domain(lon, lat)
+    if domain is None or domain not in ["", "europe"]:
+        raise NoDataFound("Point is outside of our domain")
+    dbname = "idep" if domain == "" else f"dep_{domain}"
+    with get_sqlalchemy_conn(dbname) as conn:
+        fn, distance = find_closest_file(conn, lon, lat)
+        if fn is None:
+            raise NoDataFound("No climate files found in our database")
+        if fmt == "wepp":
+            # Log this request
+            try:
+                log_request(conn, environ, fn, distance)
+            except Exception as exp:
+                LOG.exception(exp)
 
     dlfn = os.path.basename(fn)
     if fmt == "ntt":
@@ -136,8 +125,11 @@ def application(environ, start_response):
         return sio.getvalue()
 
     if fmt == "wepp":
-        with open(fn, "rb") as fh:
-            payload = fh.read()
+        if os.path.isfile(fn):
+            with open(fn, "rb") as fh:
+                payload = fh.read()
+        else:
+            raise NoDataFound("Database found a file that does not exist")
     elif fmt == "ntt":
         df = read_cli(fn)
         payload = StringIO()
