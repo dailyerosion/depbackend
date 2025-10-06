@@ -55,6 +55,9 @@ jobs:
       run: |
         python -m pip install -r pip_requirements.txt
 
+    - name: Setup Test Data
+      run: sh .github/setupdata.sh
+
     - name: Setup IEMFarm Environment
       run: |
         set -e
