@@ -1,4 +1,7 @@
+set -x
+ls /
 
+sudo ln -s `pwd` /opt/depbackend
 mkdir _data
 sudo ln -s _data /i
 mkdir -p /i/0/cli/097x035

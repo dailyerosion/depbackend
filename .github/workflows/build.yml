@@ -69,7 +69,6 @@ jobs:
     - name: Configure Apache
       run: |
         set -e
-        sudo ln -s `pwd` /opt/depbackend
         sudo cp config/apache-vhost-ci.conf /etc/apache2/sites-enabled/depbackend.conf
 
         # ci_tooling places a mod_wsgi conf with startup disabled, we enable it
