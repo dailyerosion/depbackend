@@ -124,12 +124,11 @@ def application(environ, start_response):
         df[cols].to_csv(sio, float_format="%.2f")
         return sio.getvalue()
 
+    if not os.path.isfile(fn):
+        raise NoDataFound(f"Database found a file `{fn}` that does not exist")
     if fmt == "wepp":
-        if os.path.isfile(fn):
-            with open(fn, "rb") as fh:
-                payload = fh.read()
-        else:
-            raise NoDataFound("Database found a file that does not exist")
+        with open(fn, "rb") as fh:
+            payload = fh.read()
     elif fmt == "ntt":
         df = read_cli(fn)
         payload = StringIO()
