@@ -1,3 +1,2 @@
-/auto/mapper.py
-/dl/climatefile.py?lon=-97.5&lat=35.5&format=ntt
-/dl/climatefile.py?lon=-97.5&lat=35.5
+/dl/climatefile.py?lon=-97.5&lat=35.5&format=ntt&scenario=-1
+/dl/climatefile.py?lon=-97.5&lat=35.5&scenario=-1
