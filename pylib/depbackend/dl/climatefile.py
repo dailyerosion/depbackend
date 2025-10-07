@@ -36,15 +36,21 @@ class Schema(CGIModel):
     intensity: ListOrCSVType = Field(
         None, description="Comma delimited list of intensities to compute"
     )
+    scenario: int = Field(
+        default=0,
+        description="Scenario ID",
+    )
 
 
-def log_request(conn: Connection, environ: dict, fn: str, distance: float):
+def log_request(
+    conn: Connection, environ: dict, fn: str, distance: float, scenario: int
+):
     """Log this request"""
     conn.execute(
         sql_helper("""
 INSERT into clifile_requests(client_addr, geom, climate_file_id,
 distance_degrees) VALUES (:addr, ST_Point(:lon, :lat, 4326),
-(select id from climate_files where scenario = 0 and filepath = :fn),
+(select id from climate_files where scenario = :scenario and filepath = :fn),
 :dist)
 """),
         {
@@ -53,17 +59,20 @@ distance_degrees) VALUES (:addr, ST_Point(:lon, :lat, 4326),
             "fn": fn,
             "dist": distance,
             "addr": environ.get("REMOTE_ADDR"),
+            "scenario": scenario,
         },
     )
     conn.commit()
 
 
-def find_closest_file(conn: Connection, lon: float, lat: float) -> tuple:
+def find_closest_file(
+    conn: Connection, lon: float, lat: float, scenario: int
+) -> tuple:
     """Find the closest climate file to the given point."""
     res = conn.execute(
         sql_helper("""
 select filepath, st_distance(geom, ST_Point(:lon, :lat, 4326)) as distance
-from climate_files where scenario = 0 and
+from climate_files where scenario = :scenario and
 ST_Contains(ST_MakeEnvelope(:west, :south, :east, :north, 4326), geom)
 order by geom <-> ST_Point(:lon, :lat, 4326) asc limit 1
                 """),
@@ -74,6 +83,7 @@ order by geom <-> ST_Point(:lon, :lat, 4326) asc limit 1
             "south": lat - 1,
             "east": lon + 1,
             "north": lat + 1,
+            "scenario": scenario,
         },
     )
     if res.rowcount == 0:
@@ -88,18 +98,19 @@ def application(environ, start_response):
     fmt = environ["format"]
     lon = environ["lon"]
     lat = environ["lat"]
+    scenario = environ["scenario"]
     domain = get_domain(lon, lat)
     if domain is None or domain not in ["", "europe"]:
         raise NoDataFound("Point is outside of our domain")
     dbname = "idep" if domain == "" else f"dep_{domain}"
     with get_sqlalchemy_conn(dbname) as conn:
-        fn, distance = find_closest_file(conn, lon, lat)
+        fn, distance = find_closest_file(conn, lon, lat, scenario)
         if fn is None:
             raise NoDataFound("No climate files found in our database")
         if fmt == "wepp":
             # Log this request
             try:
-                log_request(conn, environ, fn, distance)
+                log_request(conn, environ, fn, distance, scenario)
             except Exception as exp:
                 LOG.exception(exp)
 
@@ -124,12 +135,11 @@ def application(environ, start_response):
         df[cols].to_csv(sio, float_format="%.2f")
         return sio.getvalue()
 
+    if not os.path.isfile(fn):
+        raise NoDataFound(f"Database found a file `{fn}` that does not exist")
     if fmt == "wepp":
-        if os.path.isfile(fn):
-            with open(fn, "rb") as fh:
-                payload = fh.read()
-        else:
-            raise NoDataFound("Database found a file that does not exist")
+        with open(fn, "rb") as fh:
+            payload = fh.read()
     elif fmt == "ntt":
         df = read_cli(fn)
         payload = StringIO()
