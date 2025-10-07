@@ -26,6 +26,7 @@ def test_uri(uri):
     """Test a URI."""
     res = httpx.get(f"{SERVICE}{uri}", timeout=60)
     # HTTP 400 should be known failures being gracefully handled
+    print(res.content)
     assert res.status_code in [200, 400]
 
 
@@ -33,4 +34,5 @@ def test_uri(uri):
 def test_uri422(uri):
     """Test a URI."""
     res = httpx.get(f"{SERVICE}{uri}", timeout=60)
+    print(res.content)
     assert res.status_code in [422]
