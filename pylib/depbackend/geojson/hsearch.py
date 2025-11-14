@@ -1,4 +1,14 @@
-"""search for HUC12 by name."""
+""".. title:: DEP HUC12 Search by Name or ID
+
+Returns at most 10 results for a fuzzy name search or based on the HUC12 ID
+provided.  Sadly, this service does not actually emit GeoJSON.
+
+Changelog
+---------
+
+- 14 Nov 2025: The search now checks against the HUC12 ID.
+
+"""
 
 import json
 
@@ -19,8 +29,9 @@ def search(q):
     with get_sqlalchemy_conn("idep") as conn:
         res = conn.execute(
             sql_helper(
-                "SELECT huc_12, name from huc12 "
-                "WHERE name ~* :name and scenario = 0 LIMIT 10"
+                """SELECT huc_12, name from huc12
+                WHERE (name ~* :name or strpos(huc_12, :name) = 1)
+                and scenario = 0 LIMIT 10"""
             ),
             {"name": q},
         )
