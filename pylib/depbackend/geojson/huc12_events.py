@@ -76,6 +76,16 @@ def do(huc12: str, mode: str, fmt: str):
             )
             df["valid"] = pd.to_datetime(df["yr"].astype(str) + "-01-01")
     if fmt == "xlsx":
+        # Drop unuseful event columns for daily output
+        if mode == "daily":
+            df = df.drop(
+                columns=[
+                    "avg_loss_events",
+                    "avg_delivery_events",
+                    "qc_precip_events",
+                    "avg_runoff_events",
+                ]
+            )
         bio = BytesIO()
         # pylint: disable=abstract-class-instantiated
         writer = pd.ExcelWriter(bio, engine="xlsxwriter")
