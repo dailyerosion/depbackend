@@ -20,7 +20,7 @@ from pyiem.webutil import CGIModel, iemapp
 V2NAME = {
     "avg_loss": "Detachment",
     "qc_precip": "Precipitation",
-    "avg_delivery": "Hillslope Soil Loss",
+    "avg_delivery": "Hillslope Soil Delivery",
     "avg_runoff": "Runoff",
     "dt": "Dominant Tillage Code",
     "slp": "Average Slope Ratio",

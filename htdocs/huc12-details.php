@@ -95,7 +95,7 @@ echo '<table class="table table-condensed table-bordered">';
 echo "<tr><th>Precipitation</th><td>" . sprintf("%.2f %s", $row["qc_precip"], $punit) . "</td></tr>";
 echo "<tr><th>Runoff</th><td>" . sprintf("%.2f %s", $row["avg_runoff"], $punit) . "</td></tr>";
 echo "<tr><th>Detachment</th><td>" . sprintf("%.2f %s", $row["avg_loss"], $lunit) . "</td></tr>";
-echo "<tr><th>Hillslope Soil Loss</th><td>" . sprintf("%.2f %s", $row["avg_delivery"], $lunit) . "</td></tr>";
+echo "<tr><th>Hillslope Soil Delivery</th><td>" . sprintf("%.2f %s", $row["avg_delivery"], $lunit) . "</td></tr>";
 echo "</table>";
 
 /* Get top events */
