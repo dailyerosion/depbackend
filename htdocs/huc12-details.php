@@ -8,14 +8,6 @@ $metric = isset($_REQUEST["metric"]) ? intval($_REQUEST["metric"]) : 0;
 $year = date("Y", $date);
 
 $dbconn = pg_connect("dbname=idep host=iemdb-idep.local user=nobody");
-function timeit($db, $name, $sql)
-{
-    //$start = time();
-    $rs = pg_execute($db, $name, $sql);
-    //$end = time();
-    //echo "<br />Query time: ". ($end - $start);
-    return $rs;
-}
 
 /* Find the HUC12 this location is in */
 $rs = pg_prepare(
@@ -23,7 +15,7 @@ $rs = pg_prepare(
     "SELECT",
     "SELECT name from huc12 WHERE huc_12 = $1 and scenario = $2",
 );
-$rs = timeit($dbconn, "SELECT", array($huc_12, $scenario));
+$rs = pg_execute($dbconn, "SELECT", array($huc_12, $scenario));
 if (pg_num_rows($rs) != 1) {
     echo "ERROR: HUC12 was not found!";
     die();
@@ -61,7 +53,7 @@ $rs = pg_prepare($dbconn, "RES", "select sum(qc_precip) as qc_precip,
         sum(avg_runoff) as avg_runoff, sum(avg_loss) as avg_loss,
         sum(avg_delivery) as avg_delivery from results_by_huc12 WHERE 
         valid >= $1 and valid <= $2 and huc_12 = $3 and scenario = $4");
-$rs = timeit($dbconn, "RES", array(
+$rs = pg_execute($dbconn, "RES", array(
     date("Y-m-d", $date),
     date("Y-m-d", ($date2 == null) ? $date : $date2),
     $huc_12,
@@ -102,7 +94,7 @@ echo "</table>";
 $rs = pg_prepare($dbconn, "TRES", "select valid from results_by_huc12 WHERE
         huc_12 = $1 and valid > '2007-01-01' and scenario =$2 and avg_loss > 0
         ORDER by avg_loss DESC LIMIT 10");
-$rs = timeit($dbconn, "TRES", array($huc_12, $scenario));
+$rs = pg_execute($dbconn, "TRES", array($huc_12, $scenario));
 if (pg_num_rows($rs) == 0) {
     echo "<br /><strong>Top events are missing!</strong>";
 } else {
