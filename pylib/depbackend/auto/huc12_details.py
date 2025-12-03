@@ -143,6 +143,7 @@ def generate_data(environ: dict, conn: Connection | None = None) -> dict:
         avg_runoff = float(row["avg_runoff"] or 0)
         if not environ["metric"]:
             qc_precip /= 25.4
+            avg_runoff /= 25.4
             avg_loss *= 0.4463
             avg_delivery *= 0.4463
         payload["top10"].append(
