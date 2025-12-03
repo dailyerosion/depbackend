@@ -23,8 +23,6 @@ import pandas as pd
 import simplejson as json
 from pydantic import Field
 from pyiem.database import sql_helper, with_sqlalchemy_conn
-from pyiem.dep import RAMPS
-from pyiem.util import utc
 from pyiem.webutil import CGIModel, iemapp
 from sqlalchemy.engine import Connection
 
@@ -35,7 +33,7 @@ class Schema(CGIModel):
     huc12: str = Field(
         ...,
         description="HUC12 Identifier",
-        pattern="^\d{12}$",
+        pattern=r"^\d{12}$",
     )
     date: dateobj = Field(
         ...,
@@ -92,7 +90,7 @@ def generate_data(environ: dict, conn: Connection | None = None) -> dict:
             """
     select sum(qc_precip) as qc_precip,
     sum(avg_runoff) as avg_runoff, sum(avg_loss) as avg_loss,
-    sum(avg_delivery) as avg_delivery from results_by_huc12 WHERE 
+    sum(avg_delivery) as avg_delivery from results_by_huc12 WHERE
     {dtlimit} and huc_12 = :huc12
     and scenario = :scenario
         """,
