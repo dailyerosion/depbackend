@@ -7,6 +7,7 @@ requested point and provide it for download.
 Changelog
 ---------
 
+- 2025-12-08: Allow release of files from all current domains.
 - 2025-08-28: Emit climate files for the Europe domain when requested.
 
 """
@@ -100,7 +101,7 @@ def application(environ, start_response):
     lat = environ["lat"]
     scenario = environ["scenario"]
     domain = get_domain(lon, lat)
-    if domain is None or domain not in ["", "europe"]:
+    if domain is None:
         raise NoDataFound("Point is outside of our domain")
     dbname = "idep" if domain == "" else f"dep_{domain}"
     with get_sqlalchemy_conn(dbname) as conn:
