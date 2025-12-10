@@ -103,7 +103,7 @@ def application(environ, start_response):
     domain = get_domain(lon, lat)
     if domain is None:
         raise NoDataFound("Point is outside of our domain")
-    dbname = "idep" if domain == "" else f"dep_{domain}"
+    dbname = "idep" if domain == "conus" else f"dep_{domain}"
     with get_sqlalchemy_conn(dbname) as conn:
         fn, distance = find_closest_file(conn, lon, lat, scenario)
         if fn is None:
