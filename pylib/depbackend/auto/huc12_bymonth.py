@@ -6,6 +6,7 @@ from io import BytesIO
 import numpy as np
 import pandas as pd
 from pydantic import Field
+from pydep.reference import KG_M2_TO_TON_ACRE
 from pyiem.database import get_sqlalchemy_conn
 from pyiem.exceptions import NoDataFound
 from pyiem.plot import figure
@@ -40,15 +41,15 @@ def make_plot(huc12, scenario):
             """
             SELECT extract(year from valid) as yr,
             extract(month from valid) as mo,
-            sum(avg_loss) * 4.463 as avg_loss,
-            sum(avg_delivery) * 4.463 as avg_delivery,
+            sum(avg_loss) * %s as avg_loss,
+            sum(avg_delivery) * %s as avg_delivery,
             sum(qc_precip) / 25.4 as qc_precip,
             sum(avg_runoff) / 25.4 as avg_runoff
             from results_by_huc12
             WHERE huc_12 = %s and scenario = %s GROUP by mo, yr
             """,
             conn,
-            params=(huc12, scenario),
+            params=(KG_M2_TO_TON_ACRE, KG_M2_TO_TON_ACRE, huc12, scenario),
             index_col=None,
         )
     if df.empty:

@@ -5,6 +5,7 @@ from datetime import date
 import pandas as pd
 import simplejson as json
 from pydantic import Field
+from pydep.reference import KG_M2_TO_TON_ACRE
 from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.dep import RAMPS
 from pyiem.util import utc
@@ -31,8 +32,8 @@ def do(ts, ts2):
             sql_helper("""
         with data as (
             SELECT huc_12,
-            sum(coalesce(avg_loss, 0)) * 4.463 as avg_loss,
-            sum(coalesce(avg_delivery, 0)) * 4.463 as avg_delivery,
+            sum(coalesce(avg_loss, 0)) * :factor as avg_loss,
+            sum(coalesce(avg_delivery, 0)) * :factor as avg_delivery,
             sum(coalesce(qc_precip, 0)) / 25.4 as qc_precip,
             sum(coalesce(avg_runoff, 0)) / 25.4 as avg_runoff
             from results_by_huc12 WHERE valid >= :sdate and valid <= :edate
@@ -47,7 +48,7 @@ def do(ts, ts2):
         h.scenario = 0
         """),
             conn,
-            params={"sdate": ts, "edate": ts2},
+            params={"factor": KG_M2_TO_TON_ACRE, "sdate": ts, "edate": ts2},
             index_col=None,
         )
     res = {

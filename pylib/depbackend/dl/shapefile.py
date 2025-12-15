@@ -10,6 +10,7 @@ import zipfile
 
 from geopandas import GeoDataFrame
 from pydantic import Field
+from pydep.reference import KG_M2_TO_TON_ACRE
 from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
 
@@ -75,9 +76,9 @@ def workflow(start_response, dt, dt2, states, conv):
         )
     if conv == "english":
         df["prec_in"] = df["prec_mm"] / 25.4
-        df["loss_tpa"] = df["los_kgm2"] * 4.463
+        df["loss_tpa"] = df["los_kgm2"] * KG_M2_TO_TON_ACRE
         df["runof_in"] = df["runof_mm"] / 25.4
-        df["deli_tpa"] = df["deli_kgm"] * 4.463
+        df["deli_tpa"] = df["deli_kgm"] * KG_M2_TO_TON_ACRE
         df = df.drop(columns=["prec_mm", "los_kgm2", "runof_mm", "deli_kgm"])
 
     with tempfile.TemporaryDirectory() as tempdir:

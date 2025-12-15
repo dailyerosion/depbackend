@@ -5,6 +5,7 @@ import datetime
 # needed for Decimal formatting to work
 import simplejson as json
 from pydantic import Field
+from pydep.reference import KG_M2_TO_TON_ACRE
 from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.dep import RAMPS
 from pyiem.util import logger, utc
@@ -31,6 +32,7 @@ def do(ts, ts2, domain):
     params = {
         "date": ts,
         "date2": ts2,
+        "factor": KG_M2_TO_TON_ACRE,
     }
     if ts2 is not None:
         dextra = "valid >= :date and valid <= :date2"
@@ -53,8 +55,8 @@ def do(ts, ts2, domain):
                 from huc12 WHERE scenario = 0 {domainextra}),
             obs as (
                 SELECT huc_12,
-                sum(coalesce(avg_loss, 0)) * 4.463 as avg_loss,
-                sum(coalesce(avg_delivery, 0)) * 4.463 as avg_delivery,
+                sum(coalesce(avg_loss, 0)) * :factor as avg_loss,
+                sum(coalesce(avg_delivery, 0)) * :factor as avg_delivery,
                 sum(coalesce(qc_precip, 0)) / 25.4 as qc_precip,
                 sum(coalesce(avg_runoff, 0)) / 25.4 as avg_runoff
                 from results_by_huc12 WHERE {dextra}
