@@ -72,8 +72,8 @@ if (pg_num_rows($rs) == 0) {
 if ($metric == 0) {
     $row["qc_precip"] = $row["qc_precip"] / 25.4;
     $row["avg_runoff"] = $row["avg_runoff"] / 25.4;
-    $row["avg_loss"] = $row["avg_loss"] * 4.463;
-    $row["avg_delivery"] = $row["avg_delivery"] * 4.463;
+    $row["avg_loss"] = $row["avg_loss"] * 4.46091345;
+    $row["avg_delivery"] = $row["avg_delivery"] * 4.46091345;
     $punit = "inch";
     $lunit = "ton/acre";
 } else {

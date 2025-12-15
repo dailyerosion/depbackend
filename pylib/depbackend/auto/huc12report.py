@@ -7,6 +7,7 @@ from io import BytesIO
 import pandas as pd
 from metpy.units import units
 from pydantic import Field
+from pydep.reference import KG_M2_TO_TON_ACRE
 from pyiem.database import (
     get_sqlalchemy_conn,
     sql_helper,
@@ -216,8 +217,8 @@ def generate_monthly_summary_table(huc12):
             extract(month from valid)::int as month, huc_12,
             (sum(qc_precip) / 25.4)::numeric as sum_qc_precip,
             (sum(avg_runoff) / 25.4)::numeric as sum_avg_runoff,
-            (sum(avg_loss) * 4.463)::numeric as sum_avg_loss,
-            (sum(avg_delivery) * 4.463)::numeric as sum_avg_delivery,
+            (sum(avg_loss) * %s)::numeric as sum_avg_loss,
+            (sum(avg_delivery) * %s)::numeric as sum_avg_delivery,
             sum(case when qc_precip >= 50.8 then 1 else 0 end) as pdays,
             sum(case when avg_loss > 0 then 1 else 0 end) as events
             from results_by_huc12 WHERE scenario = 0 and {huc12col} = %s
@@ -233,7 +234,7 @@ def generate_monthly_summary_table(huc12):
         from data GROUP by year, month ORDER by year, month
         """,
             conn,
-            params=(huc12,),
+            params=(KG_M2_TO_TON_ACRE, KG_M2_TO_TON_ACRE, huc12),
             index_col=None,
         )
     for _, row in df.iterrows():
@@ -295,8 +296,8 @@ def generate_summary_table(huc12):
             SELECT extract(year from valid)::int as year, huc_12,
             (sum(qc_precip) / 25.4)::numeric as sum_qc_precip,
             (sum(avg_runoff) / 25.4)::numeric as sum_avg_runoff,
-            (sum(avg_loss) * 4.463)::numeric as sum_avg_loss,
-            (sum(avg_delivery) * 4.463)::numeric as sum_avg_delivery,
+            (sum(avg_loss) * %s)::numeric as sum_avg_loss,
+            (sum(avg_delivery) * %s)::numeric as sum_avg_delivery,
             sum(case when qc_precip >= 50.8 then 1 else 0 end) as pdays,
             sum(case when avg_loss > 0 then 1 else 0 end) as events
             from results_by_huc12 WHERE scenario = 0 and {huc12col} = %s
@@ -312,7 +313,7 @@ def generate_summary_table(huc12):
         from data GROUP by year ORDER by year
         """,
             conn,
-            params=(huc12,),
+            params=(KG_M2_TO_TON_ACRE, KG_M2_TO_TON_ACRE, huc12),
             index_col="year",
         )
     for year, row in df.iterrows():

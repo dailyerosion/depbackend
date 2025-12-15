@@ -8,6 +8,7 @@ import matplotlib.colors as mpcolors
 import pandas as pd
 from matplotlib.patches import Polygon, Rectangle
 from pydantic import Field
+from pydep.reference import KG_M2_TO_TON_ACRE
 from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.dep import RAMPS
 from pyiem.exceptions import NoDataFound
@@ -26,9 +27,9 @@ V2NAME = {
     "slp": "Average Slope Ratio",
 }
 V2MULTI = {
-    "avg_loss": 4.463,
+    "avg_loss": KG_M2_TO_TON_ACRE,
     "qc_precip": 1.0 / 25.4,
-    "avg_delivery": 4.463,
+    "avg_delivery": KG_M2_TO_TON_ACRE,
     "avg_runoff": 1.0 / 25.4,
     "dt": 1,
     "slp": 1,

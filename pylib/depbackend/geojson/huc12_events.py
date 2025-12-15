@@ -5,6 +5,7 @@ from io import BytesIO
 
 import pandas as pd
 from pydantic import Field
+from pydep.reference import KG_M2_TO_TON_ACRE
 from pyiem.database import get_sqlalchemy_conn
 from pyiem.util import utc
 from pyiem.webutil import CGIModel, iemapp
@@ -35,8 +36,8 @@ def do(huc12: str, mode: str, fmt: str):
             df = pd.read_sql(
                 """
                 SELECT valid,
-                avg_loss * 4.463 as avg_loss,
-                avg_delivery * 4.463 as avg_delivery,
+                avg_loss * %s as avg_loss,
+                avg_delivery * %s as avg_delivery,
                 qc_precip / 25.4 as qc_precip,
                 avg_runoff / 25.4 as avg_runoff,
                 1 as avg_loss_events,
@@ -47,7 +48,7 @@ def do(huc12: str, mode: str, fmt: str):
                 by valid ASC
             """,
                 conn,
-                params=(huc12,),
+                params=(KG_M2_TO_TON_ACRE, KG_M2_TO_TON_ACRE, huc12),
                 index_col=None,
             )
     else:
@@ -55,8 +56,8 @@ def do(huc12: str, mode: str, fmt: str):
             df = pd.read_sql(
                 """
                 SELECT extract(year from valid)::int as yr,
-                sum(avg_loss) * 4.463 as avg_loss,
-                sum(avg_delivery) * 4.463 as avg_delivery,
+                sum(avg_loss) * %s as avg_loss,
+                sum(avg_delivery) * %s as avg_delivery,
                 sum(qc_precip) / 25.4 as qc_precip,
                 sum(avg_runoff) / 25.4 as avg_runoff,
                 sum(case when avg_loss > 0 then 1 else 0 end)
@@ -71,7 +72,7 @@ def do(huc12: str, mode: str, fmt: str):
                 GROUP by yr ORDER by yr ASC
             """,
                 conn,
-                params=(huc12,),
+                params=(KG_M2_TO_TON_ACRE, KG_M2_TO_TON_ACRE, huc12),
                 index_col=None,
             )
             df["valid"] = pd.to_datetime(df["yr"].astype(str) + "-01-01")

@@ -5,6 +5,7 @@ from io import StringIO
 
 import pandas as pd
 from pydantic import Field
+from pydep.reference import KG_M2_TO_TON_ACRE
 from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
 
@@ -34,8 +35,8 @@ def gen(huc12s, sdate, edate):
             sql_helper(
                 """
             SELECT huc_12,
-            sum(avg_loss) * 4.463 as avg_loss_ton_acre,
-            sum(avg_delivery) * 4.463 as avg_delivery_ton_acre,
+            sum(avg_loss) * :factor as avg_loss_ton_acre,
+            sum(avg_delivery) * :factor as avg_delivery_ton_acre,
             sum(qc_precip) / 25.4 as rain_inch
             from results_by_huc12
             WHERE huc_12 = Any(:h) and scenario = 0
@@ -45,6 +46,7 @@ def gen(huc12s, sdate, edate):
             ),
             conn,
             params={
+                "factor": KG_M2_TO_TON_ACRE,
                 "h": huc12s,
                 "sdate": sdate,
                 "edate": edate,
