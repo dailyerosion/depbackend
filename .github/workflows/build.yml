@@ -16,7 +16,7 @@ jobs:
         shell: bash -l {0}  
     strategy:
       matrix:
-        PYTHON_VERSION: ["3.11"]
+        PYTHON_VERSION: ["3.14"]
     env:
       PYTHON_VERSION: ${{ matrix.PYTHON_VERSION }}
     steps:
@@ -45,7 +45,6 @@ jobs:
         condarc: |
           channels:
             - conda-forge
-            - defaults
         create-args: >-
           python=${{ env.PYTHON_VERSION }}
         environment-name: prod
@@ -90,7 +89,6 @@ jobs:
     - name: Upload to codecov
       uses: codecov/codecov-action@v5
       with:
-        token: ${{ secrets.CODECOV_TOKEN }}
         files: coverage.xml
 
     - name: View Apache Logs
