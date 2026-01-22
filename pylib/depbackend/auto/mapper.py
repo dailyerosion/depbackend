@@ -8,9 +8,8 @@ import matplotlib.colors as mpcolors
 import pandas as pd
 from matplotlib.patches import Polygon, Rectangle
 from pydantic import Field
-from pydep.reference import KG_M2_TO_TON_ACRE
+from pydep.reference import KG_M2_TO_TON_ACRE, RAMPS
 from pyiem.database import get_sqlalchemy_conn, sql_helper
-from pyiem.dep import RAMPS
 from pyiem.exceptions import NoDataFound
 from pyiem.plot.colormaps import dep_erosion, james
 from pyiem.plot.geoplot import Z_OVERLAY2, MapPlot
