@@ -16,8 +16,8 @@ import os
 from io import StringIO
 
 import pandas as pd
+from dailyerosion.io.wepp import read_cli
 from pydantic import Field
-from pydep.io.wepp import read_cli
 from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.exceptions import NoDataFound
 from pyiem.iemre import get_domain

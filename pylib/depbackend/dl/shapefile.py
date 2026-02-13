@@ -9,8 +9,8 @@ import tempfile
 import zipfile
 
 from geopandas import GeoDataFrame
+from dailyerosion.reference import KG_M2_TO_TON_ACRE
 from pydantic import Field
-from pydep.reference import KG_M2_TO_TON_ACRE
 from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
 

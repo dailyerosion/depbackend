@@ -5,9 +5,9 @@ from datetime import datetime
 from io import BytesIO
 
 import pandas as pd
+from dailyerosion.reference import KG_M2_TO_TON_ACRE
 from metpy.units import units
 from pydantic import Field
-from pydep.reference import KG_M2_TO_TON_ACRE
 from pyiem.database import (
     get_sqlalchemy_conn,
     sql_helper,

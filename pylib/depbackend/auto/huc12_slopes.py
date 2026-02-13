@@ -6,8 +6,8 @@ from io import BytesIO
 
 import numpy as np
 import seaborn as sns
+from dailyerosion.io.wepp import read_slp
 from pydantic import Field
-from pydep.io.wepp import read_slp
 from pyiem.exceptions import NoDataFound
 from pyiem.webutil import CGIModel, iemapp
 
