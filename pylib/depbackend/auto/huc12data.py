@@ -4,8 +4,8 @@ from datetime import date
 
 import pandas as pd
 import simplejson as json
+from dailyerosion.reference import KG_M2_TO_TON_ACRE, RAMPS
 from pydantic import Field
-from pydep.reference import KG_M2_TO_TON_ACRE, RAMPS
 from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.util import utc
 from pyiem.webutil import CGIModel, iemapp

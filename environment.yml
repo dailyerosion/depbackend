@@ -1,4 +1,5 @@
 dependencies:
+  - dailyerosion
   - gdal
   - httpx
   - pandas
@@ -7,8 +8,8 @@ dependencies:
   - psycopg
   - pydantic
   - pygrib
-  # sigh, need github main build
-  # - pyiem >=1.20.0
+  # DISCIPLINE DARYL
+  - pyiem >=1.25.0
   - pytest
   - pytest-cov
   - rasterio
