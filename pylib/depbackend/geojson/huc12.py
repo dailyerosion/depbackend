@@ -1,6 +1,22 @@
-"""GeoJSON service for HUC12 data"""
+"""GeoJSON service for HUC12 data.
 
-import datetime
+Changelog
+---------
+
+- 2026-03-10: Added validation that the `domain` parameter needs to be
+  a two character state code.
+
+Example Requests
+----------------
+
+Provide the DEP results for a single day over Iowa
+
+https://mesonet-dep.agron.iastate.edu/geojson/huc12.py?\
+date=2023-01-01&domain=IA
+"""
+
+from datetime import date as dateobj
+from typing import Annotated
 
 # needed for Decimal formatting to work
 import simplejson as json
@@ -16,12 +32,17 @@ LOG = logger()
 class Schema(CGIModel):
     """See how we are called."""
 
-    callback: str = Field(None, description="JSONP callback function")
-    date: datetime.date = Field(..., description="Date to query")
-    date2: datetime.date = Field(
-        None, description="Optional end date to query"
-    )
-    domain: str = Field(None, description="Optional domain to query")
+    callback: Annotated[
+        str | None, Field(description="JSONP callback function")
+    ] = None
+    date: Annotated[dateobj, Field(description="Date to query")]
+    date2: Annotated[
+        dateobj | None, Field(description="Optional end date to query")
+    ] = None
+    domain: Annotated[
+        str | None,
+        Field(pattern=r"^[A-Z]{2}$", description="Optional domain to query"),
+    ] = None
 
 
 def do(ts, ts2, domain):
@@ -37,8 +58,8 @@ def do(ts, ts2, domain):
         dextra = "valid >= :date and valid <= :date2"
     domainextra = ""
     if domain is not None:
-        domainextra = " and states ~* :states "
-        params["states"] = domain[:2].upper()
+        domainextra = " and states ~* :state "
+        params["state"] = domain
     with get_sqlalchemy_conn("idep") as conn:
         # Get version label
         res = conn.execute(
@@ -119,10 +140,10 @@ def do(ts, ts2, domain):
         avg_runoff=myramp,
     )
     data["max_values"] = dict(
-        avg_loss=max(avg_loss),
-        qc_precip=max(qc_precip),
-        avg_delivery=max(avg_delivery),
-        avg_runoff=max(avg_runoff),
+        avg_loss=0 if not avg_loss else max(avg_loss),
+        qc_precip=0 if not qc_precip else max(qc_precip),
+        avg_delivery=0 if not avg_delivery else max(avg_delivery),
+        avg_runoff=0 if not avg_runoff else max(avg_runoff),
     )
     return json.dumps(data)
 
