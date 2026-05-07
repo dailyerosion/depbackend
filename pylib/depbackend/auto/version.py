@@ -1,6 +1,7 @@
 """Simple JSON of DEP metadata versioning."""
 
 from io import StringIO
+from typing import Annotated
 
 import pandas as pd
 from pydantic import Field
@@ -12,10 +13,12 @@ from pyiem.webutil import CGIModel, iemapp
 class Schema(CGIModel):
     """See how we are called."""
 
-    scenario: int = Field(
-        default=0,
-        description="Scenario ID to generate metadata for",
-    )
+    scenario: Annotated[
+        int,
+        Field(
+            description="Scenario ID to generate metadata for",
+        ),
+    ] = 0
 
 
 def gen(scenario):

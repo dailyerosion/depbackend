@@ -2,6 +2,7 @@
 
 import calendar
 from io import BytesIO
+from typing import Annotated
 
 import numpy as np
 import pandas as pd
@@ -23,15 +24,19 @@ TITLES = {
 class Schema(CGIModel):
     """See how we are called."""
 
-    huc12: str = Field(
-        default="070600040601",
-        description="HUC12 to summarize",
-        max_length=12,
-    )
-    scenario: int = Field(
-        default=0,
-        description="Scenario ID to generate metadata for",
-    )
+    huc12: Annotated[
+        str,
+        Field(
+            description="HUC12 to summarize",
+            max_length=12,
+        ),
+    ] = "070600040601"
+    scenario: Annotated[
+        int,
+        Field(
+            description="Scenario ID to generate metadata for",
+        ),
+    ] = 0
 
 
 def make_plot(huc12, scenario):
