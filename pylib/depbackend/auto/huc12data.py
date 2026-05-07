@@ -1,6 +1,7 @@
 """JSON service for HUC12 data"""
 
 from datetime import date
+from typing import Annotated
 
 import pandas as pd
 import simplejson as json
@@ -14,14 +15,18 @@ from pyiem.webutil import CGIModel, iemapp
 class Schema(CGIModel):
     """See how we are called."""
 
-    sdate: date = Field(
-        default=date(2010, 1, 1),
-        description="Start Date",
-    )
-    edate: date = Field(
-        default=date(2010, 1, 1),
-        description="End Date",
-    )
+    sdate: Annotated[
+        date,
+        Field(
+            description="Start Date",
+        ),
+    ] = date(2010, 1, 1)
+    edate: Annotated[
+        date,
+        Field(
+            description="End Date",
+        ),
+    ] = date(2010, 1, 1)
 
 
 def do(ts, ts2):

@@ -18,6 +18,7 @@ huc12=070801050902&date=2020-05-01&date2=2020-05-31&scenario=0&metric=0
 """
 
 from datetime import date as dateobj
+from typing import Annotated
 
 import pandas as pd
 import simplejson as json
@@ -30,24 +31,34 @@ from sqlalchemy.engine import Connection
 class Schema(CGIModel):
     """See how we are called."""
 
-    huc12: str = Field(
-        ...,
-        description="HUC12 Identifier",
-        pattern=r"^\d{12}$",
-    )
-    date: dateobj = Field(
-        ...,
-        description="Start Date",
-    )
-    date2: dateobj = Field(default=None, description="Inclusive End Date.")
-    scenario: int = Field(
-        default=0,
-        description="Scenario ID",
-    )
-    metric: bool = Field(
-        default=False,
-        description="Whether to return metric units",
-    )
+    huc12: Annotated[
+        str,
+        Field(
+            description="HUC12 Identifier",
+            pattern=r"^\d{12}$",
+        ),
+    ]
+    date: Annotated[
+        dateobj,
+        Field(
+            description="Start Date",
+        ),
+    ]
+    date2: Annotated[
+        dateobj | None, Field(description="Inclusive End Date.")
+    ] = None
+    scenario: Annotated[
+        int,
+        Field(
+            description="Scenario ID",
+        ),
+    ] = 0
+    metric: Annotated[
+        bool,
+        Field(
+            description="Whether to return metric units",
+        ),
+    ] = False
 
 
 def get_huc12name(
