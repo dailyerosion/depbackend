@@ -1,12 +1,44 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [ "setuptools>=64", "setuptools-scm>=8" ]
+
+[project]
+name = "depbackend"
+description = "Web services associated with the daily erosion project."
+readme = "README.md"
+keywords = [ "erosion" ]
+license = "MIT"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+dynamic = [ "version" ]
+urls.homepage = "https://github.com/dailyerosion/depbackend"
+
+[tool.setuptools]
+packages.find.where = [ "pylib" ]
+package-dir."" = "pylib"
+include-package-data = true
+
+[tool.setuptools_scm]
+version_scheme = "post-release"
 
 [tool.ruff]
-line-length = 79
 target-version = "py310"
-
-[tool.ruff.lint]
-select = [
-    "B",  # bugbear
-    "F",  # pyflakes
-    # "U",
-    "W",  # pycodestyle
+line-length = 79
+lint.select = [
+  "B", # bugbear
+  "F", # pyflakes
+  # "U",
+  "W", # pycodestyle
 ]
+
+[tool.flake8]
+ignore = [ "W503", "E203" ]
+
+[tool.pycodestyle]
+ignore = [ "W503", "E203" ]
