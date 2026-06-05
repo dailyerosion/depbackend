@@ -15,3 +15,4 @@ sudo ln -s `pwd`/_data/mesonet /mesonet
 sudo ln -s `pwd` /opt/dep
 
 mkdir -p /i/0/cli/097x035
+mkdir -p /i/0/wind/074
