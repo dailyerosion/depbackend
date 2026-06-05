@@ -44,10 +44,6 @@ class Schema(CGIModel):
         float,
         Field(description="Longitude of point, degrees East", ge=-180, le=180),
     ]
-    scenario: Annotated[
-        int,
-        Field(description="Scenario ID, only 0, the default is supported."),
-    ] = 0
 
 
 @iemapp(help=__doc__, schema=Schema)
@@ -58,7 +54,7 @@ def application(environ, start_response):
     if (domain := get_domain(query.lon, query.lat)) != "conus":
         raise NoDataFound("Sorry, only CONUS data is supported at the moment")
     gid = get_gid(query.lon, query.lat, domain)
-    padded_gid = "{:06.0f}".format(gid)
+    padded_gid = f"{gid:06.0f}"
     fn = Path(f"/i/0/wind/{padded_gid[:3]}/{padded_gid}.win")
     if not fn.is_file():
         raise NoDataFound(
