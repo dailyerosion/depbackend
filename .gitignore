@@ -1,3 +1,5 @@
 /coverage.xml
 /.coverage
 /.vscode
+/build
+**egg-info
