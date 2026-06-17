@@ -3,6 +3,7 @@
 import calendar
 from datetime import datetime
 from io import BytesIO
+from typing import Annotated
 
 import pandas as pd
 from dailyerosion.reference import KG_M2_TO_TON_ACRE
@@ -28,6 +29,7 @@ from reportlab.platypus import (
 )
 from sqlalchemy.engine import Connection
 from depbackend.auto.huc12_slopes import make_plot
+from depbackend.auto.mapper import Schema as MapperSchema
 from depbackend.auto.mapper import make_overviewmap
 
 PAGE_WIDTH = letter[0]
@@ -60,12 +62,15 @@ LOCALIZATION = {
 class Schema(CGIModel):
     """See how we are called."""
 
-    huc: str = Field(
-        "070801050306",
-        description="HUC12 to generate report for",
-        min_length=8,
-        max_length=12,
-    )
+    huc: Annotated[
+        str,
+        Field(
+            pattern=r"^\d{8}(\d{4})?$",
+            description="HUC12 to generate report for",
+            min_length=8,
+            max_length=12,
+        ),
+    ] = "070801050306"
 
 
 def m2f(val):
@@ -382,12 +387,16 @@ def application(environ, start_response):
     story.append(Spacer(inch, inch * 0.25))
     story.append(Paragraph("Geographic Location", styles["Heading1"]))
     image1 = Image(
-        make_overviewmap({"overview": 1, "huc": huc12, "zoom": 250}),
+        make_overviewmap(
+            MapperSchema(overview=1, huc=huc12, zoom=250, extent=[]),
+        ),
         width=3.6 * inch,
         height=2.4 * inch,
     )
     image2 = Image(
-        make_overviewmap({"overview": 1, "huc": huc12, "zoom": 11}),
+        make_overviewmap(
+            MapperSchema(overview=1, huc=huc12, zoom=11, extent=[]),
+        ),
         width=3.6 * inch,
         height=2.4 * inch,
     )

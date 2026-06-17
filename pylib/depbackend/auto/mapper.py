@@ -1,21 +1,45 @@
-"""Mapping Interface."""
+""".. title:: DEP Map Generation Service.
 
-from datetime import date, datetime
+This service emits PNG map result images for a given set of parameters.
+
+Changelog
+---------
+
+- 2026-06-17: Droped `iowa` and `mn` parameters, use state=IA or state=MN.
+- 2026-06-17: Dropped `averaged` parameter as ill-formed and unused.
+- 2026-06-17: Dropped `cruse` parameter as ill-formed and unused.
+- 2026-06-17: Initial documentation release.
+
+Example Requests
+----------------
+
+Provide annual averaged runoff for Kansas between 2010 and 2015
+
+https://mesonet-dep.agron.iastate.edu/auto/mapper.py?sdate=2010-01-01&\
+edate=2015-12-31&v=avg_runoff&annual=true&state=KS
+
+"""
+
+from datetime import date
 from io import BytesIO
+from typing import Annotated
 
 import geopandas as gpd
 import matplotlib.colors as mpcolors
 import pandas as pd
 from dailyerosion.reference import KG_M2_TO_TON_ACRE, RAMPS
 from matplotlib.patches import Polygon, Rectangle
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.exceptions import NoDataFound
 from pyiem.plot.colormaps import dep_erosion, james
 from pyiem.plot.geoplot import Z_OVERLAY2, MapPlot
 from pyiem.plot.util import pretty_bins
-from pyiem.reference import EPSG
+from pyiem.reference import EPSG, state_bounds
 from pyiem.webutil import CGIModel, iemapp
+from pyproj import Transformer
+from pyproj.crs.crs import CRS
+from sqlalchemy.engine import Connection
 
 V2NAME = {
     "avg_loss": "Detachment",
@@ -46,34 +70,140 @@ V2UNITS = {
 class Schema(CGIModel):
     """See how we are called."""
 
-    dpi: int = Field(100, description="Dots per inch", ge=50, le=300)
-    year: int = Field(2024, description="Year of start date.")
-    month: int = Field(1, description="Month of start date.")
-    day: int = Field(1, description="Day of start date.")
-    year2: int = Field(None, description="Year of end date.")
-    month2: int = Field(None, description="Month of end date.")
-    day2: int = Field(None, description="Day of end date.")
-    scenario: int = Field(0, description="Scenario ID")
-    v: str = Field("avg_loss", description="Variable to plot")
-    huc: str = Field(None, description="HUC12 to plot")
-    zoom: float = Field(10.0, description="Zoom level")
-    overview: bool = Field(False, description="Generate overview map")
-    averaged: bool = Field(False, description="Averaged over period")
-    progressbar: bool = Field(False, description="Show progress bar")
-    cruse: bool = Field(False, description="Show crude conversion")
-    iowa: bool = Field(False, description="Limit to Iowa")
-    mn: bool = Field(False, description="Limit to Minnesota")
+    dpi: Annotated[int, Field(description="Dots per inch", ge=50, le=300)] = (
+        100
+    )
+    sdate: Annotated[
+        date | None,
+        Field(description="Start date to plot", ge=date(2007, 1, 1)),
+    ] = None
+    edate: Annotated[
+        date | None, Field(description="End date to plot", ge=date(2007, 1, 1))
+    ] = None
+    year: Annotated[int, Field(description="Year of start date.", ge=2007)] = (
+        2024
+    )
+    month: Annotated[
+        int, Field(description="Month of start date.", ge=1, le=12)
+    ] = 1
+    day: Annotated[
+        int, Field(description="Day of start date.", ge=1, le=31)
+    ] = 1
+    year2: Annotated[
+        int | None, Field(description="Year of end date.", ge=2007)
+    ] = None
+    month2: Annotated[
+        int | None, Field(description="Month of end date.", ge=1, le=12)
+    ] = None
+    day2: Annotated[
+        int | None, Field(description="Day of end date.", ge=1, le=31)
+    ] = None
+    scenario: Annotated[int, Field(description="Scenario ID", ge=0)] = 0
+    v: Annotated[str, Field(description="Variable to plot")] = "avg_loss"
+    huc: Annotated[
+        str | None,
+        Field(
+            pattern=r"^\d{8}(\d{4})?$",
+            description="HUC8 or HUC12 to plot, required when overview is set",
+        ),
+    ] = None
+    state: Annotated[
+        str | None,
+        Field(
+            pattern="^[A-Z]{2}$",
+            description=(
+                "If provided, zoom the map to the provided state abbreviation."
+            ),
+        ),
+    ] = None
+    extent: Annotated[
+        list[float],
+        Field(
+            default_factory=list,
+            description=(
+                "Custom map extent as [west, south, east, north] in lat/lon. "
+                "``state`` parameter used before this."
+            ),
+        ),
+    ]
+    zoom: Annotated[float, Field(description="Zoom level")] = 10.0
+    overview: Annotated[bool, Field(description="Generate overview map")] = (
+        False
+    )
+    progressbar: Annotated[bool, Field(description="Show progress bar")] = (
+        False
+    )
+    annual: Annotated[
+        bool,
+        Field(
+            description=(
+                "If variable allows, produce annual averages by dividing by "
+                "the number of years between sdate and edate"
+            ),
+        ),
+    ] = False
+
+    @field_validator("extent", mode="before")
+    @classmethod
+    def ensure_extent_is_valid(cls, v):
+        """Ensure that if extent is provided, it is valid."""
+        if not v:
+            return v
+        tokens = v if isinstance(v, (list, tuple)) else str(v).split(",")
+        if len(tokens) != 4:
+            raise ValueError("Extent must be a list of 4 floats")
+        return [float(val) for val in tokens]
+
+    @model_validator(mode="after")
+    def ensure_huc_with_overview(self):
+        """If overview is requested, ensure we have a HUC."""
+        if self.overview and self.huc is None:
+            raise ValueError("Overview maps require a HUC")
+        return self
+
+    @model_validator(mode="after")
+    def merge_provided_dates(self):
+        """Ensure sdate and edate eventually get set."""
+        if self.sdate is None:
+            self.sdate = date(self.year, self.month, self.day)
+        if self.edate is None:
+            if (
+                self.year2 is not None
+                and self.month2 is not None
+                and self.day2 is not None
+            ):
+                self.edate = date(self.year2, self.month2, self.day2)
+            else:
+                self.edate = self.sdate
+        if self.edate < self.sdate:
+            raise ValueError("edate must be on or after sdate")
+        return self
+
+    @field_validator("v", mode="before")
+    @classmethod
+    def ensure_variable_is_known(cls, value: str) -> str:
+        """Ensure requested variable is renderable."""
+        if value not in V2NAME:
+            raise ValueError(f"Unknown variable: {value}")
+        return value
+
+    @field_validator("state", mode="before")
+    @classmethod
+    def ensure_state_is_known(cls, value: str | None) -> str | None:
+        """Ensure requested state has known bounds."""
+        if value is not None and value not in state_bounds:
+            raise ValueError(f"Unknown state abbreviation: {value}")
+        return value
 
 
-def make_overviewmap(environ: dict):
+def make_overviewmap(query: Schema):
     """Draw a pretty map of just the HUC."""
-    huc = environ["huc"]
     projection = EPSG[5070]
     params = {}
     huclimiter = ""
-    if huc is not None and len(huc) >= 8:
+    if len(query.huc) >= 8:
         huclimiter = " and substr(huc_12, 1, 8) = :huc8 "
-        params["huc8"] = huc[:8]
+        params["huc8"] = query.huc[:8]
     with get_sqlalchemy_conn("idep") as conn:
         df = gpd.read_postgis(
             sql_helper(
@@ -93,10 +223,10 @@ def make_overviewmap(environ: dict):
     if df.empty:
         raise NoDataFound("No Data Found for this scenario and date")
     minx, miny, maxx, maxy = df["geom"].total_bounds
-    buf = environ["zoom"] * 1000.0  # 10km
-    hucname = "" if huc not in df.index else df.at[huc, "name"]
+    buf = query.zoom * 1000.0  # 10km
+    hucname = "" if query.huc not in df.index else df.at[query.huc, "name"]
     subtitle = "The HUC8 is in tan"
-    if len(huc) == 12:
+    if len(query.huc) == 12:
         subtitle = "HUC12 highlighted in red, the HUC8 it resides in is in tan"
     m = MapPlot(
         axisbg="#EEEEEE",
@@ -108,7 +238,7 @@ def make_overviewmap(environ: dict):
         east=maxx + buf,
         projection=projection,
         continentalcolor="white",
-        title=f"DEP HUC {huc}:: {hucname}",
+        title=f"DEP HUC {query.huc}:: {hucname}",
         subtitle=subtitle,
         titlefontsize=20,
         subtitlefontsize=18,
@@ -117,14 +247,14 @@ def make_overviewmap(environ: dict):
     for _huc12, row in df.iterrows():
         p = Polygon(
             row["geom"].exterior.coords,
-            fc="red" if _huc12 == huc else "tan",
+            fc="red" if _huc12 == query.huc else "tan",
             ec="k",
             zorder=Z_OVERLAY2,
             lw=0.1,
         )
         m.ax.add_patch(p)
         # If this is our HUC, add some text to prevent cities overlay overlap
-        if _huc12 == huc:
+        if _huc12 == query.huc:
             m.plot_values(
                 [row["centroid_x"]],
                 [row["centroid_y"]],
@@ -132,7 +262,7 @@ def make_overviewmap(environ: dict):
                 color="None",
                 outlinecolor="None",
             )
-    if huc is not None:
+    if query.huc is not None:
         m.drawcounties()
         m.drawcities()
     ram = BytesIO()
@@ -164,72 +294,92 @@ def label_scenario(ax, scenario, conn):
     )
 
 
-def make_map(conn, huc, ts, ts2, scenario, v, environ):
-    """Make the map"""
-    projection = EPSG[5070]
-    # suggested for runoff and precip
-    if v in ["qc_precip", "avg_runoff"]:
-        # c = ['#ffffa6', '#9cf26d', '#76cc94', '#6399ba', '#5558a1']
-        cmap = james()
-    # suggested for detachment
-    else:
-        # c =['#cbe3bb', '#c4ff4d', '#ffff4d', '#ffc44d', '#ff4d4d', '#c34dee']
-        cmap = dep_erosion()
+def build_map_object(query: Schema, df: pd.DataFrame):
+    """Figure out the map instance to generate."""
+    title = f"for {query.sdate:%-d %B %Y}"
+    if query.sdate != query.edate:
+        title = (
+            f"for period between {query.sdate:%-d %b %Y} "
+            f"and {query.edate:%-d %b %Y}"
+        )
 
-    title = f"for {ts:%-d %B %Y}"
-    aextra = ""
-    if ts != ts2:
-        title = f"for period between {ts:%-d %b %Y} and {ts2:%-d %b %Y}"
-        if environ["averaged"]:
-            aextra = "/yr"
-            if f"{ts:%m%d}" == "0101" and f"{ts2:%m%d}" == "1231":
-                title = f"averaged over inclusive years ({ts:%Y}-{ts2:%Y})"
-            else:
-                title = (
-                    f"averaged between {ts:%-d %b} and {ts2:%-d %b} "
-                    f"({ts:%Y}-{ts2:%Y})"
-                )
+    projection: CRS = EPSG[5070]
+    buf = 10000.0  # 10km
+    if not df.empty:
+        minx, miny, maxx, maxy = df["geom"].total_bounds
+    else:
+        # meh
+        minx, miny, maxx, maxy = -678439, 1551480, 677645, 2888203.0
+
+    # If state is provided, zoom to that state instead
+    if query.state is not None:
+        minx, miny, maxx, maxy = state_bounds[query.state]
+        # Reproject to our map projection
+        transformer = Transformer.from_crs(
+            EPSG[4326], projection, always_xy=True
+        )
+        minx, miny = transformer.transform(minx, miny)
+        maxx, maxy = transformer.transform(maxx, maxy)
+
+    elif query.extent:
+        minx, miny, maxx, maxy = query.extent
+        # Reproject to our map projection
+        transformer = Transformer.from_crs(
+            EPSG[4326], projection, always_xy=True
+        )
+        minx, miny = transformer.transform(minx, miny)
+        maxx, maxy = transformer.transform(maxx, maxy)
+
+    aec = " per year" if query.annual else ""
+
+    return MapPlot(
+        axisbg="#EEEEEE",
+        logo="dep",
+        sector="custom",
+        south=miny - buf,
+        north=maxy + buf,
+        west=minx - buf,
+        east=maxx + buf,
+        projection=projection,
+        title=f"DEP {V2NAME[query.v]} by HUC12 {title}{aec}",
+        titlefontsize=16,
+        caption="Daily Erosion Project",
+    )
+
+
+def get_map_data(query: Schema, conn: Connection) -> gpd.GeoDataFrame:
+    """Figure out the data for this query."""
     # Compute what the huc12 scenario is for this scenario
     res = conn.execute(
         sql_helper("select huc12_scenario from scenarios where id = :id"),
-        {"id": scenario},
+        {"id": query.scenario},
     )
     huc12_scenario = res.fetchone()[0]
 
-    # Check that we have data for this date!
-    res = conn.execute(
-        sql_helper("SELECT value from properties where key = 'last_date_0'"),
-    )
-    if res.rowcount == 0:
-        lastts = datetime(2007, 1, 1)
-    else:
-        lastts = datetime.strptime(res.fetchone()[0], "%Y-%m-%d")
-    floor = date(2007, 1, 1)
-    if ts > lastts.date() or ts2 > lastts.date() or ts < floor:
-        raise NoDataFound("Data Not Availale Yet, check back later.")
     params = {
-        "scenario": scenario,
+        "scenario": query.scenario,
         "huc12_scenario": huc12_scenario,
-        "sday1": f"{ts:%m%d}",
-        "sday2": f"{ts2:%m%d}",
-        "ts": ts,
-        "ts2": ts2,
-        "dbcol": V2MULTI[v],
+        "sday1": f"{query.sdate:%m%d}",
+        "sday2": f"{query.edate:%m%d}",
+        "ts": query.sdate,
+        "ts2": query.edate,
+        "dbcol": V2MULTI[query.v],
+        "state": query.state,
     }
     huclimiter = ""
-    if huc is not None:
-        if len(huc) == 8:
+    if query.huc is not None:
+        if len(query.huc) == 8:
             huclimiter = " and substr(i.huc_12, 1, 8) = :huc8 "
-            params["huc8"] = huc
-        elif len(huc) == 12:
+            params["huc8"] = query.huc
+        elif len(query.huc) == 12:
             huclimiter = " and i.huc_12 = :huc12 "
-            params["huc12"] = huc
-    if environ["iowa"]:
-        huclimiter += " and i.states ~* 'IA' "
-    if environ["mn"]:
-        huclimiter += " and i.states ~* 'MN' "
-    if v in ["dt", "slp"]:
-        colname = "dominant_tillage" if v == "dt" else "average_slope_ratio"
+            params["huc12"] = query.huc
+    if query.state:
+        huclimiter += " and i.states ~* :state "
+    if query.v in ["dt", "slp"]:
+        colname = (
+            "dominant_tillage" if query.v == "dt" else "average_slope_ratio"
+        )
         df = gpd.read_postgis(
             sql_helper(
                 """
@@ -244,31 +394,6 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
             params=params,
             geom_col="geom",
         )  # type: ignore
-    elif environ["averaged"]:
-        df = gpd.read_postgis(
-            sql_helper(
-                """
-        WITH data as (
-        SELECT huc_12, sum({v}) / 10. as d from results_by_huc12
-        WHERE scenario = :scenario and to_char(valid, 'mmdd') between
-        :sday1 and :sday2
-        and valid between :ts and :ts2
-        GROUP by huc_12)
-
-        SELECT simple_geom as geom,
-        coalesce(d.d, 0) * :dbcol as data
-        from huc12 i LEFT JOIN data d
-        ON (i.huc_12 = d.huc_12) WHERE i.scenario = :huc12_scenario
-        {huclimiter}
-        """,
-                huclimiter=huclimiter,
-                v=v,
-            ),
-            conn,
-            params=params,
-            geom_col="geom",
-        )  # type: ignore
-
     else:
         df = gpd.read_postgis(
             sql_helper(
@@ -285,81 +410,84 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
         {huclimiter}
         """,
                 huclimiter=huclimiter,
-                v=v,
+                v=query.v,
             ),
             conn,
             params=params,
             geom_col="geom",
         )  # type: ignore
-    if df.empty:
-        raise NoDataFound("No Data Found for this scenario and date")
-    minx, miny, maxx, maxy = df["geom"].total_bounds
-    buf = 10000.0  # 10km
-    mp = MapPlot(
-        axisbg="#EEEEEE",
-        logo="dep",
-        sector="custom",
-        south=miny - buf,
-        north=maxy + buf,
-        west=minx - buf,
-        east=maxx + buf,
-        projection=projection,
-        title=f"DEP {V2NAME[v]} by HUC12 {title}",
-        titlefontsize=16,
-        caption="Daily Erosion Project",
-    )
-    if ts == ts2:
+        if query.annual:
+            years = query.edate.year - query.sdate.year + 1
+            df["data"] = df["data"] / years
+    return df
+
+
+def make_map(conn, query: Schema):
+    """Make the map"""
+    # suggested for runoff and precip
+    if query.v in ["qc_precip", "avg_runoff"]:
+        cmap = james()
+    # suggested for detachment
+    else:
+        cmap = dep_erosion()
+
+    df = get_map_data(query, conn)
+    mp = build_map_object(query, df)
+
+    if query.sdate == query.edate:
         # Daily
         bins = RAMPS["english"][0]
     else:
         bins = RAMPS["english"][1]
     # Check if our ramp makes sense
-    p95 = df["data"].describe(percentiles=[0.95])["95%"]
-    if not pd.isna(p95) and p95 > bins[-1]:
-        bins = pretty_bins(0, p95)
-        bins[0] = 0.01
-    if v == "dt":
-        bins = range(1, 8)
-    if v == "slp":
-        bins = [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.5]
-    norm = mpcolors.BoundaryNorm(bins, cmap.N)
-    for _, row in df.to_crs(mp.panels[0].crs).iterrows():
-        p = Polygon(
-            row["geom"].exterior.coords,
-            fc=cmap(norm([row["data"]]))[0],
-            ec="k",
-            zorder=5,
-            lw=0.1,
+    units = V2UNITS[query.v] + ("/year" if query.annual else "")
+    if not df.empty:
+        p95 = df["data"].describe(percentiles=[0.95])["95%"]
+        if not pd.isna(p95) and p95 > bins[-1]:
+            bins = pretty_bins(0, p95)
+            bins[0] = 0.01
+        if query.v == "dt":
+            bins = range(1, 8)
+        if query.v == "slp":
+            bins = [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.5]
+        norm = mpcolors.BoundaryNorm(bins, cmap.N)
+        for _, row in df.to_crs(mp.panels[0].crs).iterrows():
+            p = Polygon(
+                row["geom"].exterior.coords,
+                fc=cmap(norm([row["data"]]))[0],
+                ec="k",
+                zorder=5,
+                lw=0.1,
+            )
+            mp.ax.add_patch(p)
+        lbl = [round(_, 2) for _ in bins]
+        mp.draw_colorbar(
+            bins,
+            cmap,
+            norm,
+            units=units,
+            clevlabels=lbl,
+            spacing="uniform",
         )
-        mp.ax.add_patch(p)
 
-    label_scenario(mp.ax, scenario, conn)
+    label_scenario(mp.ax, query.scenario, conn)
 
-    lbl = [round(_, 2) for _ in bins]
-    if huc is not None:
+    if query.huc is not None:
         mp.drawcounties()
         mp.drawcities()
-    mp.draw_colorbar(
-        bins,
-        cmap,
-        norm,
-        units=V2UNITS[v] + aextra,
-        clevlabels=lbl,
-        spacing="uniform",
-    )
     avgval = None
-    if environ["progressbar"]:
+    if query.progressbar:
         avgval = df["data"].mean()
-        _ll = ts.year if environ["averaged"] else "Avg"
+        _ll = query.sdate.year
         mp.fig.text(
             0.06,
             0.905,
-            f"{_ll}: {avgval:4.1f} T/a",
+            f"{_ll}: {avgval:4.1f} {units}",
             fontsize=14,
         )
         bar_width = 0.698
         # yes, a small one off with years having 366 days
-        proportion = (ts2 - ts).days / 365.0 * bar_width
+        proportion = (query.edate - query.sdate).days / 365.0 * bar_width
         rect1 = Rectangle(
             (0.20, 0.905),
             bar_width,
@@ -380,71 +508,28 @@ def make_map(conn, huc, ts, ts2, scenario, v, environ):
             figure=mp.fig,
         )
         mp.fig.patches.append(rect2)
-    if environ["cruse"]:
-        # Crude conversion of T/a to mm depth
-        depth = avgval / 5.0
-        mp.ax.text(
-            0.9,
-            0.92,
-            f"{depth:.2f}mm",
-            zorder=1000,
-            fontsize=24,
-            transform=mp.ax.transAxes,
-            ha="center",
-            va="center",
-            bbox=dict(color="k", alpha=0.5, boxstyle="round,pad=0.1"),
-            color="white",
-        )
     ram = BytesIO()
-    mp.fig.savefig(ram, format="png", dpi=environ["dpi"])
+    mp.fig.savefig(ram, format="png", dpi=query.dpi)
     ram.seek(0)
     return ram
 
 
-def get_ts_ts2(environ):
-    """Figure out the ts and ts2."""
-    year = environ["year"]
-    month = environ["month"]
-    day = environ["day"]
-    year2 = year if environ["year2"] is None else environ["year2"]
-    month2 = month if environ["month2"] is None else environ["month2"]
-    day2 = day if environ["day2"] is None else environ["day2"]
-    ts = date(year, month, day)
-    ts2 = date(year2, month2, day2)
-    return ts, ts2
-
-
-def get_mckey(environ):
-    """Figure out the memcache key."""
-    ts, ts2 = get_ts_ts2(environ)
-    key = (
-        f"/auto/map.py/{environ['huc']}/{ts:%Y%m%d}/{ts2:%Y%m%d}/"
-        f"{environ['scenario']}/{environ['v']}"
-    )
-    if environ["overview"]:
-        key = f"/auto/map.py/{environ['huc']}/{environ['zoom']}"
-    return key
-
-
 @iemapp(
-    memcachekey=get_mckey,
     content_type="image/png",
     help=__doc__,
     schema=Schema,
     parse_times=False,
 )
-def application(environ, start_response):
+def application(environ: dict, start_response: callable):
     """Our mod-wsgi handler"""
-    response_headers = [("Content-type", "image/png")]
-    start_response("200 OK", response_headers)
-    scenario = environ["scenario"]
-    v = environ["v"]
-    huc = environ["huc"]
-    ts, ts2 = get_ts_ts2(environ)
-    if environ["overview"] and huc is not None:
-        res = make_overviewmap(environ).read()
+    # Capture the request
+    query: Schema = environ["_cgimodel_schema"]
+    if query.overview:
+        res = make_overviewmap(query).read()
     else:
         with get_sqlalchemy_conn("idep") as conn:
-            res = make_map(conn, huc, ts, ts2, scenario, v, environ).read()
+            res = make_map(conn, query).read()
 
+    # Ensure that all work is done before we start to respond.
+    start_response("200 OK", [("Content-type", "image/png")])
     return res
