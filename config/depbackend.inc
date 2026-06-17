@@ -35,7 +35,7 @@ Include /opt/iemwebfarm/config/vhost_common.conf
     RewriteRule ^([0-9]{8,12})_report.pdf$ huc12report.py?huc=$1 [QSA]
     RewriteRule ^([0-9]{4})([0-9]{2})([0-9]{2})_([0-9]{4})([0-9]{2})([0-9]{2}).json$ huc12data.py?sdate=$1-$2-$3&edate=$4-$5-$6 [QSA]
     # Allow script.png to forward to script.py
-    RewriteRule ^(.*).png$ $1.py [QSA]
+    RewriteRule ^([A-Za-z0-9_-]+).png$ $1.py [QSA]
   </Directory>
 
   <Directory "/opt/depbackend/htdocs/geojson">

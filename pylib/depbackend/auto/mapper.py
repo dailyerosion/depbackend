@@ -148,7 +148,7 @@ class Schema(CGIModel):
         """Ensure that if extent is provided, it is valid."""
         if not v:
             return v
-        tokens = v.split(",")
+        tokens = v if isinstance(v, (list, tuple)) else str(v).split(",")
         if len(tokens) != 4:
             raise ValueError("Extent must be a list of 4 floats")
         return [float(val) for val in tokens]
@@ -176,7 +176,25 @@ class Schema(CGIModel):
                 model.edate = date(model.year2, model.month2, model.day2)
             else:
                 model.edate = model.sdate
+        if model.edate < model.sdate:
+            raise ValueError("edate must be on or after sdate")
         return model
+
+    @field_validator("v")
+    @classmethod
+    def ensure_variable_is_known(cls, value: str) -> str:
+        """Ensure requested variable is renderable."""
+        if value not in V2NAME:
+            raise ValueError(f"Unknown variable: {value}")
+        return value
+
+    @field_validator("state")
+    @classmethod
+    def ensure_state_is_known(cls, value: str | None) -> str | None:
+        """Ensure requested state has known bounds."""
+        if value is not None and value not in state_bounds:
+            raise ValueError(f"Unknown state abbreviation: {value}")
+        return value
 
 
 def make_overviewmap(query: Schema):
@@ -423,6 +441,7 @@ def make_map(conn, query: Schema):
     else:
         bins = RAMPS["english"][1]
     # Check if our ramp makes sense
+    units = V2UNITS[query.v] + ("/year" if query.annual else "")
     if not df.empty:
         p95 = df["data"].describe(percentiles=[0.95])["95%"]
         if not pd.isna(p95) and p95 > bins[-1]:
@@ -447,7 +466,7 @@ def make_map(conn, query: Schema):
             bins,
             cmap,
             norm,
-            units=V2UNITS[query.v] + "/year" if query.annual else "",
+            units=units,
             clevlabels=lbl,
             spacing="uniform",
         )
@@ -464,7 +483,7 @@ def make_map(conn, query: Schema):
         mp.fig.text(
             0.06,
             0.905,
-            f"{_ll}: {avgval:4.1f} T/a",
+            f"{_ll}: {avgval:4.1f} {units}",
             fontsize=14,
         )
         bar_width = 0.698

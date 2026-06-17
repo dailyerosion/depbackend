@@ -3,6 +3,7 @@
 import calendar
 from datetime import datetime
 from io import BytesIO
+from typing import Annotated
 
 import pandas as pd
 from dailyerosion.reference import KG_M2_TO_TON_ACRE
@@ -61,12 +62,15 @@ LOCALIZATION = {
 class Schema(CGIModel):
     """See how we are called."""
 
-    huc: str = Field(
-        "070801050306",
-        description="HUC12 to generate report for",
-        min_length=8,
-        max_length=12,
-    )
+    huc: Annotated[
+        str,
+        Field(
+            pattern=r"^\d{8}(\d{4})?$",
+            description="HUC12 to generate report for",
+            min_length=8,
+            max_length=12,
+        ),
+    ] = "070801050306"
 
 
 def m2f(val):
