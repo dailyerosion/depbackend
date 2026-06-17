@@ -181,16 +181,14 @@ class Schema(CGIModel):
         return model
 
     @field_validator("v")
-    @classmethod
-    def ensure_variable_is_known(cls, value: str) -> str:
+    def ensure_variable_is_known(self, value: str) -> str:
         """Ensure requested variable is renderable."""
         if value not in V2NAME:
             raise ValueError(f"Unknown variable: {value}")
         return value
 
     @field_validator("state")
-    @classmethod
-    def ensure_state_is_known(cls, value: str | None) -> str | None:
+    def ensure_state_is_known(self, value: str | None) -> str | None:
         """Ensure requested state has known bounds."""
         if value is not None and value not in state_bounds:
             raise ValueError(f"Unknown state abbreviation: {value}")
