@@ -144,7 +144,8 @@ class Schema(CGIModel):
     ] = False
 
     @field_validator("extent", mode="before")
-    def ensure_extent_is_valid(self, v):
+    @classmethod
+    def ensure_extent_is_valid(cls, v):
         """Ensure that if extent is provided, it is valid."""
         if not v:
             return v
@@ -154,41 +155,41 @@ class Schema(CGIModel):
         return [float(val) for val in tokens]
 
     @model_validator(mode="after")
-    @classmethod
-    def ensure_huc_with_overview(cls, model):
+    def ensure_huc_with_overview(self):
         """If overview is requested, ensure we have a HUC."""
-        if model.overview and model.huc is None:
+        if self.overview and self.huc is None:
             raise ValueError("Overview maps require a HUC")
-        return model
+        return self
 
     @model_validator(mode="after")
-    @classmethod
-    def merge_provided_dates(cls, model):
+    def merge_provided_dates(self):
         """Ensure sdate and edate eventually get set."""
-        if model.sdate is None:
-            model.sdate = date(model.year, model.month, model.day)
-        if model.edate is None:
+        if self.sdate is None:
+            self.sdate = date(self.year, self.month, self.day)
+        if self.edate is None:
             if (
-                model.year2 is not None
-                and model.month2 is not None
-                and model.day2 is not None
+                self.year2 is not None
+                and self.month2 is not None
+                and self.day2 is not None
             ):
-                model.edate = date(model.year2, model.month2, model.day2)
+                self.edate = date(self.year2, self.month2, self.day2)
             else:
-                model.edate = model.sdate
-        if model.edate < model.sdate:
+                self.edate = self.sdate
+        if self.edate < self.sdate:
             raise ValueError("edate must be on or after sdate")
-        return model
+        return self
 
-    @field_validator("v")
-    def ensure_variable_is_known(self, value: str) -> str:
+    @field_validator("v", mode="before")
+    @classmethod
+    def ensure_variable_is_known(cls, value: str) -> str:
         """Ensure requested variable is renderable."""
         if value not in V2NAME:
             raise ValueError(f"Unknown variable: {value}")
         return value
 
-    @field_validator("state")
-    def ensure_state_is_known(self, value: str | None) -> str | None:
+    @field_validator("state", mode="before")
+    @classmethod
+    def ensure_state_is_known(cls, value: str | None) -> str | None:
         """Ensure requested state has known bounds."""
         if value is not None and value not in state_bounds:
             raise ValueError(f"Unknown state abbreviation: {value}")
