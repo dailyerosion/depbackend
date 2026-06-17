@@ -144,7 +144,7 @@ class Schema(CGIModel):
     ] = False
 
     @field_validator("extent", mode="before")
-    def ensure_extent_is_valid(cls, v):
+    def ensure_extent_is_valid(self, v):
         """Ensure that if extent is provided, it is valid."""
         if not v:
             return v
@@ -281,7 +281,10 @@ def build_map_object(query: Schema, df: pd.DataFrame):
     """Figure out the map instance to generate."""
     title = f"for {query.sdate:%-d %B %Y}"
     if query.sdate != query.edate:
-        title = f"for period between {query.sdate:%-d %b %Y} and {query.edate:%-d %b %Y}"
+        title = (
+            f"for period between {query.sdate:%-d %b %Y} "
+            f"and {query.edate:%-d %b %Y}"
+        )
 
     projection: CRS = EPSG[5070]
     buf = 10000.0  # 10km
