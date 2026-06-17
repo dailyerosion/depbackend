@@ -28,6 +28,7 @@ from reportlab.platypus import (
 )
 from sqlalchemy.engine import Connection
 from depbackend.auto.huc12_slopes import make_plot
+from depbackend.auto.mapper import Schema as MapperSchema
 from depbackend.auto.mapper import make_overviewmap
 
 PAGE_WIDTH = letter[0]
@@ -382,12 +383,16 @@ def application(environ, start_response):
     story.append(Spacer(inch, inch * 0.25))
     story.append(Paragraph("Geographic Location", styles["Heading1"]))
     image1 = Image(
-        make_overviewmap({"overview": 1, "huc": huc12, "zoom": 250}),
+        make_overviewmap(
+            MapperSchema(overview=1, huc=huc12, zoom=250, extent=[]),
+        ),
         width=3.6 * inch,
         height=2.4 * inch,
     )
     image2 = Image(
-        make_overviewmap({"overview": 1, "huc": huc12, "zoom": 11}),
+        make_overviewmap(
+            MapperSchema(overview=1, huc=huc12, zoom=11, extent=[]),
+        ),
         width=3.6 * inch,
         height=2.4 * inch,
     )
