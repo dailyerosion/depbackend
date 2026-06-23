@@ -180,4 +180,4 @@ def application(environ, start_response) -> bytes:
     headers = [("Content-Type", "application/json")]
     payload = json.dumps(data)
     start_response("200 OK", headers)
-    return payload
+    return payload.encode("ascii")

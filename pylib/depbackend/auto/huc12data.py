@@ -50,6 +50,7 @@ def do(ts, ts2):
         coalesce(round(d.avg_delivery::numeric, 2), 0) as avg_delivery,
         coalesce(round(d.avg_runoff::numeric, 2), 0) as avg_runoff
         from huc12 h LEFT JOIN data d ON (h.huc12_id = d.huc12_id)
+        WHERE h.scenario_id = 0
         """),
             conn,
             params={"factor": KG_M2_TO_TON_ACRE, "sdate": ts, "edate": ts2},
@@ -93,8 +94,8 @@ def get_mckey(environ):
 
 
 @iemapp(help=__doc__, schema=Schema, memcachekey=get_mckey)
-def application(environ, start_response):
+def application(environ, start_response) -> bytes:
     """Do Fun things"""
     payload = do(environ["sdate"], environ["edate"])
     start_response("200 OK", [("Content-Type", "application/json")])
-    return payload
+    return payload.encode("ascii")

@@ -35,7 +35,7 @@ def uri2client(uri: str) -> TestResponse:
     return Client(mod.application).get(f"?{cgi}")
 
 
-@pytest.mark.parametrize("uri", get_uris(""))
+@pytest.mark.parametrize("uri", list(get_uris("")))
 def test_uri(uri):
     """Test a URI."""
     res = uri2client(uri)
@@ -43,7 +43,7 @@ def test_uri(uri):
     assert res.status_code in [200, 400]
 
 
-@pytest.mark.parametrize("uri", get_uris("422"))
+@pytest.mark.parametrize("uri", list(get_uris("422")))
 def test_uri422(uri):
     """Test a URI."""
     res = uri2client(uri)

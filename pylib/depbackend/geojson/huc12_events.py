@@ -2,6 +2,7 @@
 
 import json
 from io import BytesIO
+from typing import Annotated
 
 import pandas as pd
 from dailyerosion.reference import KG_M2_TO_TON_ACRE
@@ -17,15 +18,21 @@ EXL = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 class Schema(CGIModel):
     """See how we are called."""
 
-    callback: str = Field(None, description="JSONP callback function")
-    huc12: str = Field(
-        "000000000000",
-        description="HUC12 identifier",
-        min_length=12,
-        max_length=12,
-    )
-    mode: str = Field("daily", description="daily or yearly summary")
-    format: str = Field("json", description="json or xlsx")
+    callback: Annotated[
+        str | None, Field(description="JSONP callback function")
+    ] = None
+    huc12: Annotated[
+        str, Field(description="HUC12 identifier", pattern=r"^\d{12}$")
+    ] = "000000000000"
+    mode: Annotated[
+        str,
+        Field(
+            description="daily or yearly summary", pattern=r"^(daily|yearly)$"
+        ),
+    ] = "daily"
+    format: Annotated[
+        str, Field(description="json or xlsx", pattern=r"^(json|xlsx)$")
+    ] = "json"
 
 
 def do(huc12: str, mode: str, fmt: str):
@@ -128,7 +135,7 @@ def application(environ, start_response):
 
     if fmt == "json":
         headers = [("Content-Type", "application/vnd.geo+json")]
-    elif fmt == "xlsx":
+    else:
         headers = [
             ("Content-Type", EXL),
             ("Content-disposition", f"attachment; Filename=dep{huc12}.xlsx"),

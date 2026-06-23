@@ -2,11 +2,19 @@
 
 Emits a zip file containing a shapefile of the IDEP HUC12
 
+Example Requests
+----------------
+
+Get the results for 1 Jul 2025
+
+https://mesonet-dep.agron.iastate.edu/dl/shapefile.py?dt=2025-07-01
+
 """
 
 import datetime
 import tempfile
 import zipfile
+from collections.abc import Callable
 
 from geopandas import GeoDataFrame
 from dailyerosion.reference import KG_M2_TO_TON_ACRE
@@ -28,7 +36,7 @@ class Schema(CGIModel):
     conv: str = Field("metric", description="Output units, metric or english")
 
 
-def workflow(start_response: callable, dt, dt2, states, conv):
+def workflow(start_response: Callable, dt, dt2, states, conv):
     """Generate for a given date"""
     dextra = "valid = :dt"
     params = {"dt": dt}
@@ -44,7 +52,8 @@ def workflow(start_response: callable, dt, dt2, states, conv):
             sql_helper(
                 """
             with data as (
-                SELECT simple_geom, huc12_code, name, dominant_tillage,
+                SELECT simple_geom, huc12_id,
+                huc12_code, name, dominant_tillage,
                 avg_slope_ratio, s.dep_version_label as version
                 from huc12 h, scenario s
                 WHERE h.scenario_id = 0 and s.scenario_id = 0
@@ -111,7 +120,7 @@ def workflow(start_response: callable, dt, dt2, states, conv):
 
 
 @iemapp(help=__doc__, schema=Schema)
-def application(environ, start_response):
+def application(environ, start_response: Callable):
     """Generate something nice for the users"""
     dt = environ["dt"]
     dt2 = environ["dt2"]
