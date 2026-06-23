@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from dailyerosion.reference import KG_M2_TO_TON_ACRE
 from pydantic import Field
-from pyiem.database import get_sqlalchemy_conn
+from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.exceptions import NoDataFound
 from pyiem.plot import figure
 from pyiem.webutil import CGIModel, iemapp
@@ -41,20 +41,25 @@ class Schema(CGIModel):
 
 def make_plot(huc12, scenario):
     """Make the map"""
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         df = pd.read_sql(
-            """
+            sql_helper("""
             SELECT extract(year from valid) as yr,
             extract(month from valid) as mo,
-            sum(avg_loss) * %s as avg_loss,
-            sum(avg_delivery) * %s as avg_delivery,
-            sum(qc_precip) / 25.4 as qc_precip,
-            sum(avg_runoff) / 25.4 as avg_runoff
-            from results_by_huc12
-            WHERE huc_12 = %s and scenario = %s GROUP by mo, yr
-            """,
+            sum(avg_loss_kgm2) * :factor as avg_loss,
+            sum(avg_delivery_kgm2) * :factor as avg_delivery,
+            sum(qc_precip_mm) / 25.4 as qc_precip,
+            sum(avg_runoff_mm) / 25.4 as avg_runoff
+            from water_results_by_huc12
+            WHERE huc12_id = get_huc12_id(:huc12_code, :scenario_id)
+            and scenario_id = :scenario_id GROUP by mo, yr
+            """),
             conn,
-            params=(KG_M2_TO_TON_ACRE, KG_M2_TO_TON_ACRE, huc12, scenario),
+            params={
+                "factor": KG_M2_TO_TON_ACRE,
+                "huc12_code": huc12,
+                "scenario_id": scenario,
+            },
             index_col=None,
         )
     if df.empty:
@@ -113,7 +118,8 @@ def make_plot(huc12, scenario):
 
 
 @iemapp(help=__doc__, schema=Schema)
-def application(environ, start_response):
+def application(environ, start_response) -> bytes:
     """Do something fun"""
+    payload = make_plot(environ["huc12"], environ["scenario"]).read()
     start_response("200 OK", [("Content-type", "image/png")])
-    return [make_plot(environ["huc12"], environ["scenario"]).read()]
+    return payload

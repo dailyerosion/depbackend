@@ -70,17 +70,18 @@ def get_huc12name(
     res = conn.execute(
         sql_helper(
             """
-        SELECT name from huc12 WHERE huc_12 = :huc12 and scenario = :scenario
+        SELECT name from huc12 WHERE huc12_code = :huc12_code
+        and scenario_id = :scenario
         """
         ),
-        {"huc12": huc12, "scenario": scenario},
+        {"huc12_code": huc12, "scenario": scenario},
     ).fetchone()
     if res is None:
         return "Unknown HUC12"
     return res[0]
 
 
-@with_sqlalchemy_conn("idep")
+@with_sqlalchemy_conn("dep")
 def generate_data(environ: dict, conn: Connection | None = None) -> dict:
     """Do work"""
     payload = {
@@ -99,11 +100,11 @@ def generate_data(environ: dict, conn: Connection | None = None) -> dict:
     resultsdf = pd.read_sql(
         sql_helper(
             """
-    select sum(qc_precip) as qc_precip,
-    sum(avg_runoff) as avg_runoff, sum(avg_loss) as avg_loss,
-    sum(avg_delivery) as avg_delivery from results_by_huc12 WHERE
-    {dtlimit} and huc_12 = :huc12
-    and scenario = :scenario
+    select sum(qc_precip_mm) as qc_precip,
+    sum(avg_runoff_mm) as avg_runoff, sum(avg_loss_kgm2) as avg_loss,
+    sum(avg_delivery_kgm2) as avg_delivery from water_results_by_huc12 WHERE
+    {dtlimit} and huc12_id = get_huc12_id(:huc12, :scenario)
+    and scenario_id = :scenario
         """,
             dtlimit=dtlimit,
         ),
@@ -135,14 +136,16 @@ def generate_data(environ: dict, conn: Connection | None = None) -> dict:
 
     top10 = pd.read_sql(
         sql_helper("""
-    select valid, qc_precip, avg_loss, avg_delivery, avg_runoff
-    from results_by_huc12 WHERE
-    huc_12 = :huc12 and scenario = :scenario and avg_loss > 0
-    ORDER by avg_loss DESC LIMIT 10
+    select valid, qc_precip_mm as qc_precip, avg_loss_kgm2 as avg_loss,
+    avg_delivery_kgm2 as avg_delivery, avg_runoff_mm as avg_runoff
+    from water_results_by_huc12 WHERE
+    huc12_id = get_huc12_id(:huc12_code, :scenario)
+    and scenario_id = :scenario and avg_loss_kgm2 > 0
+    ORDER by avg_loss_kgm2 DESC LIMIT 10
         """),
         conn,
         params={
-            "huc12": environ["huc12"],
+            "huc12_code": environ["huc12"],
             "scenario": environ["scenario"],
         },
         index_col=None,
@@ -171,9 +174,10 @@ def generate_data(environ: dict, conn: Connection | None = None) -> dict:
 
 
 @iemapp(help=__doc__, schema=Schema)
-def application(environ, start_response):
+def application(environ, start_response) -> bytes:
     """Do Fun things"""
     data = generate_data(environ)
     headers = [("Content-Type", "application/json")]
+    payload = json.dumps(data)
     start_response("200 OK", headers)
-    return json.dumps(data)
+    return payload.encode("ascii")

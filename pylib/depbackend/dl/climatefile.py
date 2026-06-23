@@ -49,9 +49,10 @@ def log_request(
     """Log this request"""
     conn.execute(
         sql_helper("""
-INSERT into clifile_requests(client_addr, geom, climate_file_id,
+INSERT into climate_file_requests(client_addr, geom, climate_file_id,
 distance_degrees) VALUES (:addr, ST_Point(:lon, :lat, 4326),
-(select id from climate_files where scenario = :scenario and filepath = :fn),
+(select climate_file_id from climate_file
+ where scenario_id = :scenario and filepath = :fn),
 :dist)
 """),
         {
@@ -73,7 +74,7 @@ def find_closest_file(
     res = conn.execute(
         sql_helper("""
 select filepath, st_distance(geom, ST_Point(:lon, :lat, 4326)) as distance
-from climate_files where scenario = :scenario and
+from climate_file where scenario_id = :scenario and
 ST_Contains(ST_MakeEnvelope(:west, :south, :east, :north, 4326), geom)
 order by geom <-> ST_Point(:lon, :lat, 4326) asc limit 1
                 """),
@@ -103,7 +104,7 @@ def application(environ, start_response):
     domain = get_domain(lon, lat)
     if domain is None:
         raise NoDataFound("Point is outside of our domain")
-    dbname = "idep" if domain == "conus" else f"dep_{domain}"
+    dbname = "dep" if domain == "conus" else f"dep_{domain}"
     with get_sqlalchemy_conn(dbname) as conn:
         fn, distance = find_closest_file(conn, lon, lat, scenario)
         if fn is None:

@@ -31,25 +31,26 @@ class Schema(CGIModel):
 
 def do(ts, ts2):
     """Do work"""
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         df = pd.read_sql(
             sql_helper("""
         with data as (
-            SELECT huc_12,
-            sum(coalesce(avg_loss, 0)) * :factor as avg_loss,
-            sum(coalesce(avg_delivery, 0)) * :factor as avg_delivery,
-            sum(coalesce(qc_precip, 0)) / 25.4 as qc_precip,
-            sum(coalesce(avg_runoff, 0)) / 25.4 as avg_runoff
-            from results_by_huc12 WHERE valid >= :sdate and valid <= :edate
-            and scenario = 0 GROUP by huc_12)
+            SELECT w.huc12_id,
+            sum(coalesce(avg_loss_kgm2, 0)) * :factor as avg_loss,
+            sum(coalesce(avg_delivery_kgm2, 0)) * :factor as avg_delivery,
+            sum(coalesce(qc_precip_mm, 0)) / 25.4 as qc_precip,
+            sum(coalesce(avg_runoff_mm, 0)) / 25.4 as avg_runoff
+            from water_results_by_huc12 w
+            WHERE valid >= :sdate and valid <= :edate
+            and w.scenario_id = 0 GROUP by w.huc12_id)
 
-        SELECT h.huc_12,
+        SELECT h.huc12_code,
         coalesce(round(d.avg_loss::numeric, 2), 0) as avg_loss,
         coalesce(round(d.qc_precip::numeric, 2), 0) as qc_precip,
         coalesce(round(d.avg_delivery::numeric, 2), 0) as avg_delivery,
         coalesce(round(d.avg_runoff::numeric, 2), 0) as avg_runoff
-        from huc12 h LEFT JOIN data d ON (h.huc_12 = d.huc_12) WHERE
-        h.scenario = 0
+        from huc12 h LEFT JOIN data d ON (h.huc12_id = d.huc12_id)
+        WHERE h.scenario_id = 0
         """),
             conn,
             params={"factor": KG_M2_TO_TON_ACRE, "sdate": ts, "edate": ts2},
@@ -93,8 +94,8 @@ def get_mckey(environ):
 
 
 @iemapp(help=__doc__, schema=Schema, memcachekey=get_mckey)
-def application(environ, start_response):
+def application(environ, start_response) -> bytes:
     """Do Fun things"""
-    headers = [("Content-Type", "application/json")]
-    start_response("200 OK", headers)
-    return do(environ["sdate"], environ["edate"])
+    payload = do(environ["sdate"], environ["edate"])
+    start_response("200 OK", [("Content-Type", "application/json")])
+    return payload.encode("ascii")

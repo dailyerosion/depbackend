@@ -23,12 +23,13 @@ class Schema(CGIModel):
 
 def gen(scenario):
     """Make the map"""
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         # Check that we have data for this date!
         df = pd.read_sql(
             sql_helper(
                 """
-            select d.* from scenarios s, dep_version d where s.id = :scenario
+            select d.* from scenario s, dep_version d
+            where s.scenario_id = :scenario
             and s.dep_version_label = d.label
         """
             ),
@@ -47,5 +48,6 @@ def gen(scenario):
 @iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """Do something fun"""
+    payload = gen(environ["scenario"])
     start_response("200 OK", [("Content-type", "application/json")])
-    return gen(environ["scenario"])
+    return payload

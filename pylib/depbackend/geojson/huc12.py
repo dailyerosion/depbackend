@@ -60,10 +60,12 @@ def do(ts, ts2, domain):
     if domain is not None:
         domainextra = " and states ~* :state "
         params["state"] = domain
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         # Get version label
         res = conn.execute(
-            sql_helper("SELECT dep_version_label from scenarios where id = 0")
+            sql_helper(
+                "SELECT dep_version_label from scenario where scenario_id = 0"
+            )
         )
         dep_version_label = res.fetchone()[0]
         res = conn.execute(
@@ -71,23 +73,23 @@ def do(ts, ts2, domain):
                 """
             WITH data as (
                 SELECT ST_asGeoJson(ST_Transform(simple_geom, 4326), 4) as g,
-                huc_12
-                from huc12 WHERE scenario = 0 {domainextra}),
+                huc12_id, huc12_code
+                from huc12 WHERE scenario_id = 0 {domainextra}),
             obs as (
-                SELECT huc_12,
-                sum(coalesce(avg_loss, 0)) * :factor as avg_loss,
-                sum(coalesce(avg_delivery, 0)) * :factor as avg_delivery,
-                sum(coalesce(qc_precip, 0)) / 25.4 as qc_precip,
-                sum(coalesce(avg_runoff, 0)) / 25.4 as avg_runoff
-                from results_by_huc12 WHERE {dextra}
-                and scenario = 0 GROUP by huc_12)
+                SELECT huc12_id,
+                sum(coalesce(avg_loss_kgm2, 0)) * :factor as avg_loss,
+                sum(coalesce(avg_delivery_kgm2, 0)) * :factor as avg_delivery,
+                sum(coalesce(qc_precip_mm, 0)) / 25.4 as qc_precip,
+                sum(coalesce(avg_runoff_mm, 0)) / 25.4 as avg_runoff
+                from water_results_by_huc12 WHERE {dextra}
+                and scenario_id = 0 GROUP by huc12_id)
 
-            SELECT d.g, d.huc_12,
+            SELECT d.g, d.huc12_code,
             coalesce(round(o.avg_loss::numeric, 2), 0),
             coalesce(round(o.qc_precip::numeric, 2), 0),
             coalesce(round(o.avg_delivery::numeric, 2), 0),
             coalesce(round(o.avg_runoff::numeric, 2), 0)
-            from data d LEFT JOIN obs o ON (d.huc_12 = o.huc_12)
+            from data d LEFT JOIN obs o ON (d.huc12_id = o.huc12_id)
         """,
                 domainextra=domainextra,
                 dextra=dextra,
@@ -166,10 +168,10 @@ def get_mckey(environ):
 )
 def application(environ, start_response):
     """Do Fun things"""
-    headers = [("Content-Type", "application/vnd.geo+json")]
-    start_response("200 OK", headers)
     domain = environ["domain"]
     ts = environ["date"]
     ts2 = environ["date2"]
+    payload = do(ts, ts2, domain)
+    start_response("200 OK", [("Content-Type", "application/vnd.geo+json")])
 
-    return do(ts, ts2, domain)
+    return payload

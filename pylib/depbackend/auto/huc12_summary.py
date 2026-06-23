@@ -29,19 +29,20 @@ class Schema(CGIModel):
 
 def gen(huc12s, sdate, edate):
     """Make the map"""
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         # Check that we have data for this date!
         df = pd.read_sql(
             sql_helper(
                 """
-            SELECT huc_12,
-            sum(avg_loss) * :factor as avg_loss_ton_acre,
-            sum(avg_delivery) * :factor as avg_delivery_ton_acre,
-            sum(qc_precip) / 25.4 as rain_inch
-            from results_by_huc12
-            WHERE huc_12 = Any(:h) and scenario = 0
-            and valid >= :sdate and valid <= :edate
-            GROUP by huc_12 ORDER by huc_12
+            SELECT huc12_code,
+            sum(avg_loss_kgm2) * :factor as avg_loss_ton_acre,
+            sum(avg_delivery_kgm2) * :factor as avg_delivery_ton_acre,
+            sum(qc_precip_mm) / 25.4 as rain_inch
+            from water_results_by_huc12 w
+            JOIN huc12 h on (w.huc12_id = h.huc12_id)
+            WHERE h.huc12_code = Any(:h) and w.scenario_id = 0
+            and w.valid >= :sdate and w.valid <= :edate
+            GROUP by h.huc12_code ORDER by h.huc12_code
         """
             ),
             conn,
@@ -58,9 +59,9 @@ def gen(huc12s, sdate, edate):
 
 
 @iemapp(help=__doc__, schema=Schema)
-def application(environ, start_response):
+def application(environ, start_response) -> bytes:
     """Do something fun"""
     huc12s = [x[:12] for x in environ["huc12"]][:64]
-
+    payload = gen(huc12s, environ["sdate"], environ["edate"]).encode("utf-8")
     start_response("200 OK", [("Content-type", "text/plain")])
-    return [gen(huc12s, environ["sdate"], environ["edate"]).encode("utf-8")]
+    return payload

@@ -7,13 +7,13 @@ $scenario = isset($_REQUEST["scenario"]) ? intval($_REQUEST["scenario"]) : 0;
 $metric = isset($_REQUEST["metric"]) ? intval($_REQUEST["metric"]) : 0;
 $year = date("Y", $date);
 
-$dbconn = pg_connect("dbname=idep host=iemdb-idep.local user=nobody");
+$dbconn = pg_connect("dbname=dep host=iemdb-dep.local user=nobody");
 
 /* Find the HUC12 this location is in */
 $rs = pg_prepare(
     $dbconn,
     "SELECT",
-    "SELECT name from huc12 WHERE huc_12 = $1 and scenario = $2",
+    "SELECT name from huc12 WHERE huc12_code = $1 and scenario_id = $2",
 );
 $rs = pg_execute($dbconn, "SELECT", array($huc_12, $scenario));
 if (pg_num_rows($rs) != 1) {
@@ -49,10 +49,11 @@ EOF;
 
 /* Fetch Results */
 echo "<h4>{$nicedate} Summary</h4>";
-$rs = pg_prepare($dbconn, "RES", "select sum(qc_precip) as qc_precip,
-        sum(avg_runoff) as avg_runoff, sum(avg_loss) as avg_loss,
-        sum(avg_delivery) as avg_delivery from results_by_huc12 WHERE 
-        valid >= $1 and valid <= $2 and huc_12 = $3 and scenario = $4");
+$rs = pg_prepare($dbconn, "RES", "select sum(qc_precip_mm) as qc_precip,
+        sum(avg_runoff_mm) as avg_runoff, sum(avg_loss_kgm2) as avg_loss,
+        sum(avg_delivery_kgm2) as avg_delivery from water_results_by_huc12 WHERE 
+        valid >= $1 and valid <= $2 and huc12_id = get_huc12_id($3, $4)
+        and scenario_id = $4");
 $rs = pg_execute($dbconn, "RES", array(
     date("Y-m-d", $date),
     date("Y-m-d", ($date2 == null) ? $date : $date2),
@@ -91,9 +92,9 @@ echo "<tr><th>Hillslope Soil Delivery</th><td>" . sprintf("%.2f %s", $row["avg_d
 echo "</table>";
 
 /* Get top events */
-$rs = pg_prepare($dbconn, "TRES", "select valid from results_by_huc12 WHERE
-        huc_12 = $1 and valid > '2007-01-01' and scenario =$2 and avg_loss > 0
-        ORDER by avg_loss DESC LIMIT 10");
+$rs = pg_prepare($dbconn, "TRES", "select valid from water_results_by_huc12 WHERE
+        huc12_id = get_huc12_id($1, $2) and valid > '2007-01-01' and scenario_id = $2 and avg_loss_kgm2 > 0
+        ORDER by avg_loss_kgm2 DESC LIMIT 10");
 $rs = pg_execute($dbconn, "TRES", array($huc_12, $scenario));
 if (pg_num_rows($rs) == 0) {
     echo "<br /><strong>Top events are missing!</strong>";

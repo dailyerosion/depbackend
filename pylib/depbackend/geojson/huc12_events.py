@@ -2,6 +2,7 @@
 
 import json
 from io import BytesIO
+from typing import Annotated
 
 import pandas as pd
 from dailyerosion.reference import KG_M2_TO_TON_ACRE
@@ -17,58 +18,66 @@ EXL = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 class Schema(CGIModel):
     """See how we are called."""
 
-    callback: str = Field(None, description="JSONP callback function")
-    huc12: str = Field(
-        "000000000000",
-        description="HUC12 identifier",
-        min_length=12,
-        max_length=12,
-    )
-    mode: str = Field("daily", description="daily or yearly summary")
-    format: str = Field("json", description="json or xlsx")
+    callback: Annotated[
+        str | None, Field(description="JSONP callback function")
+    ] = None
+    huc12: Annotated[
+        str, Field(description="HUC12 identifier", pattern=r"^\d{12}$")
+    ] = "000000000000"
+    mode: Annotated[
+        str,
+        Field(
+            description="daily or yearly summary", pattern=r"^(daily|yearly)$"
+        ),
+    ] = "daily"
+    format: Annotated[
+        str, Field(description="json or xlsx", pattern=r"^(json|xlsx)$")
+    ] = "json"
 
 
 def do(huc12: str, mode: str, fmt: str):
     """Do work"""
     utcnow = utc()
     if mode == "daily":
-        with get_sqlalchemy_conn("idep") as conn:
+        with get_sqlalchemy_conn("dep") as conn:
             df = pd.read_sql(
                 """
                 SELECT valid,
-                avg_loss * %s as avg_loss,
-                avg_delivery * %s as avg_delivery,
-                qc_precip / 25.4 as qc_precip,
-                avg_runoff / 25.4 as avg_runoff,
+                avg_loss_kgm2 * %s as avg_loss,
+                avg_delivery_kgm2 * %s as avg_delivery,
+                qc_precip_mm / 25.4 as qc_precip,
+                avg_runoff_mm / 25.4 as avg_runoff,
                 1 as avg_loss_events,
                 1 as avg_delivery_events,
                 1 as qc_precip_events,
                 1 as avg_runoff_events
-                from results_by_huc12 where huc_12 = %s and scenario = 0 ORDER
-                by valid ASC
+                from water_results_by_huc12
+                where huc12_id = get_huc12_id(%s, 0) and scenario_id = 0
+                ORDER by valid ASC
             """,
                 conn,
                 params=(KG_M2_TO_TON_ACRE, KG_M2_TO_TON_ACRE, huc12),
                 index_col=None,
             )
     else:
-        with get_sqlalchemy_conn("idep") as conn:
+        with get_sqlalchemy_conn("dep") as conn:
             df = pd.read_sql(
                 """
                 SELECT extract(year from valid)::int as yr,
-                sum(avg_loss) * %s as avg_loss,
-                sum(avg_delivery) * %s as avg_delivery,
-                sum(qc_precip) / 25.4 as qc_precip,
-                sum(avg_runoff) / 25.4 as avg_runoff,
-                sum(case when avg_loss > 0 then 1 else 0 end)
+                sum(avg_loss_kgm2) * %s as avg_loss,
+                sum(avg_delivery_kgm2) * %s as avg_delivery,
+                sum(qc_precip_mm) / 25.4 as qc_precip,
+                sum(avg_runoff_mm) / 25.4 as avg_runoff,
+                sum(case when avg_loss_kgm2 > 0 then 1 else 0 end)
                     as avg_loss_events,
-                sum(case when avg_delivery > 0 then 1 else 0 end)
+                sum(case when avg_delivery_kgm2 > 0 then 1 else 0 end)
                     as avg_delivery_events,
-                sum(case when qc_precip > 0 then 1 else 0 end)
+                sum(case when qc_precip_mm > 0 then 1 else 0 end)
                     as qc_precip_events,
-                sum(case when avg_runoff > 0 then 1 else 0 end)
+                sum(case when avg_runoff_mm > 0 then 1 else 0 end)
                     as avg_runoff_events
-                from results_by_huc12 where huc_12 = %s and scenario = 0
+                from water_results_by_huc12 where
+                huc12_id = get_huc12_id(%s, 0) and scenario_id = 0
                 GROUP by yr ORDER by yr ASC
             """,
                 conn,
@@ -126,13 +135,11 @@ def application(environ, start_response):
 
     if fmt == "json":
         headers = [("Content-Type", "application/vnd.geo+json")]
-    elif fmt == "xlsx":
+    else:
         headers = [
             ("Content-Type", EXL),
             ("Content-disposition", f"attachment; Filename=dep{huc12}.xlsx"),
         ]
-    start_response("200 OK", headers)
-
     mckey = f"/geojson/huc12_events/{huc12}/{mode}/{fmt}"
     mc = Client("iem-memcached:11211")
     res = mc.get(mckey)
@@ -140,6 +147,7 @@ def application(environ, start_response):
         res = do(huc12, mode, fmt)
         if fmt == "xlsx":
             mc.close()
+            start_response("200 OK", headers)
             return [res]
         mc.set(mckey, res, 15)
     else:
@@ -147,4 +155,5 @@ def application(environ, start_response):
     mc.close()
     if cb is not None:
         res = f"{cb}({res})"
+    start_response("200 OK", headers)
     return res
