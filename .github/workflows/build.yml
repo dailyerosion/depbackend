@@ -42,9 +42,9 @@ jobs:
         python-version: ${{ matrix.PYTHON_VERSION }}
 
     - name: Setup Test Directories
-      run: sh .github/setuppaths.sh
+      run: bash .github/setuppaths.sh
     - name: Setup Test Data
-      run: sh .github/setupdata.sh
+      run: bash .github/setupdata.sh
 
     - name: Configure Apache
       run: |
