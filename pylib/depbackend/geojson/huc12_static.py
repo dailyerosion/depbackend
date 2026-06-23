@@ -7,16 +7,16 @@ from pyiem.webutil import iemapp
 
 def do():
     """Do work"""
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         df = gpd.read_postgis(
             """
             SELECT ST_ReducePrecision(ST_Transform(simple_geom, 4326),
             0.0001) as geo, dominant_tillage as dt,
-            round(average_slope_ratio::numeric, 3) as slp,
-            huc_12, name from huc12 WHERE scenario = 0
+            round(avg_slope_ratio::numeric, 3) as slp,
+            huc12_code, name from huc12 WHERE scenario_id = 0
             """,
             conn,
-            index_col="huc_12",
+            index_col="huc12_code",
             geom_col="geo",
         )
     return df.to_json()
@@ -29,6 +29,6 @@ def do():
 )
 def application(_environ, start_response):
     """Do Fun things"""
-    headers = [("Content-Type", "application/vnd.geo+json")]
-    start_response("200 OK", headers)
-    return do()
+    payload = do()
+    start_response("200 OK", [("Content-Type", "application/vnd.geo+json")])
+    return payload

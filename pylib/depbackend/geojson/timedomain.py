@@ -17,7 +17,7 @@ class Schema(CGIModel):
     scenario: int = Field(0, description="Scenario to query for")
 
 
-@with_sqlalchemy_conn("idep")
+@with_sqlalchemy_conn("dep")
 def get_time(scenario: int, conn: Connection = None) -> dict:
     """Search for q"""
     d = dict()
@@ -40,6 +40,6 @@ def get_time(scenario: int, conn: Connection = None) -> dict:
 @iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """DO Something"""
-    headers = [("Content-type", "application/json")]
-    start_response("200 OK", headers)
-    return json.dumps(get_time(environ["scenario"]))
+    payload = json.dumps(get_time(environ["scenario"]))
+    start_response("200 OK", [("Content-type", "application/json")])
+    return payload

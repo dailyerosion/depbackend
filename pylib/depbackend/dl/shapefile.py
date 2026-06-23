@@ -28,7 +28,7 @@ class Schema(CGIModel):
     conv: str = Field("metric", description="Output units, metric or english")
 
 
-def workflow(start_response, dt, dt2, states, conv):
+def workflow(start_response: callable, dt, dt2, states, conv):
     """Generate for a given date"""
     dextra = "valid = :dt"
     params = {"dt": dt}
@@ -39,33 +39,34 @@ def workflow(start_response, dt, dt2, states, conv):
     if states:
         _s = [f" states ~* '{a[:2]}' " for a in states]
         statelimit = " and (" + " or ".join(_s) + " ) "
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         df = GeoDataFrame.from_postgis(
             sql_helper(
                 """
             with data as (
-                SELECT simple_geom, huc_12, name, dominant_tillage,
-                average_slope_ratio, s.dep_version_label as version
-                from huc12 h, scenarios s WHERE h.scenario = 0 and s.id = 0
+                SELECT simple_geom, huc12_code, name, dominant_tillage,
+                avg_slope_ratio, s.dep_version_label as version
+                from huc12 h, scenario s
+                WHERE h.scenario_id = 0 and s.scenario_id = 0
                 {statelimit}),
             obs as (
-                SELECT huc_12,
-                sum(coalesce(avg_loss, 0)) as avg_loss,
-                sum(coalesce(avg_delivery, 0)) as avg_delivery,
-                sum(coalesce(qc_precip, 0)) as qc_precip,
-                sum(coalesce(avg_runoff, 0)) as avg_runoff
-                from results_by_huc12 WHERE {dextra} and scenario = 0
-                GROUP by huc_12)
+                SELECT huc12_id,
+                sum(coalesce(avg_loss_kgm2, 0)) as avg_loss,
+                sum(coalesce(avg_delivery_kgm2, 0)) as avg_delivery,
+                sum(coalesce(qc_precip_mm, 0)) as qc_precip,
+                sum(coalesce(avg_runoff_mm, 0)) as avg_runoff
+                from water_results_by_huc12 WHERE {dextra} and scenario_id = 0
+                GROUP by huc12_id)
 
-            SELECT d.simple_geom as geo, d.huc_12, d.name,
+            SELECT d.simple_geom as geo, d.huc12_id, d.name,
             d.dominant_tillage as tillcode,
-            d.average_slope_ratio as avg_slp1,
+            d.avg_slope_ratio as avg_slp1,
             coalesce(o.qc_precip, 0) as prec_mm,
             coalesce(o.avg_loss, 0) as los_kgm2,
             coalesce(o.avg_runoff, 0) as runof_mm,
             coalesce(o.avg_delivery, 0) as deli_kgm,
             d.version
-            from data d LEFT JOIN obs o ON (d.huc_12 = o.huc_12)
+            from data d LEFT JOIN obs o ON (d.huc12_id = o.huc12_id)
         """,
                 statelimit=statelimit,
                 dextra=dextra,

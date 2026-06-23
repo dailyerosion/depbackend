@@ -49,6 +49,14 @@ V2NAME = {
     "dt": "Dominant Tillage Code",
     "slp": "Average Slope Ratio",
 }
+COLMAPPER = {
+    "avg_loss": "avg_loss_kgm2",
+    "qc_precip": "qc_precip_mm",
+    "avg_delivery": "avg_delivery_kgm2",
+    "avg_runoff": "avg_runoff_mm",
+    "dt": "dominant_tillage",
+    "slp": "avg_slope_ratio",
+}
 V2MULTI = {
     "avg_loss": KG_M2_TO_TON_ACRE,
     "qc_precip": 1.0 / 25.4,
@@ -202,23 +210,23 @@ def make_overviewmap(query: Schema):
     params = {}
     huclimiter = ""
     if len(query.huc) >= 8:
-        huclimiter = " and substr(huc_12, 1, 8) = :huc8 "
+        huclimiter = " and substr(huc12_code, 1, 8) = :huc8 "
         params["huc8"] = query.huc[:8]
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         df = gpd.read_postgis(
             sql_helper(
                 """
-            SELECT simple_geom as geom, huc_12,
+            SELECT simple_geom as geom, huc12_code,
             ST_x(ST_Transform(ST_Centroid(geom), 4326)) as centroid_x,
             ST_y(ST_Transform(ST_Centroid(geom), 4326)) as centroid_y, name
-            from huc12 i WHERE i.scenario = 0 {huclimiter}
+            from huc12 i WHERE i.scenario_id = 0 {huclimiter}
         """,
                 huclimiter=huclimiter,
             ),
             conn,
             geom_col="geom",
             params=params,
-            index_col="huc_12",
+            index_col="huc12_code",
         )  # type: ignore
     if df.empty:
         raise NoDataFound("No Data Found for this scenario and date")
@@ -276,7 +284,7 @@ def label_scenario(ax, scenario, conn):
     if scenario == 0:
         return
     res = conn.execute(
-        sql_helper("select label from scenarios where id = :id"),
+        sql_helper("select label from scenario where scenario_id = :id"),
         {"id": scenario},
     )
     if res.rowcount == 0:
@@ -351,7 +359,9 @@ def get_map_data(query: Schema, conn: Connection) -> gpd.GeoDataFrame:
     """Figure out the data for this query."""
     # Compute what the huc12 scenario is for this scenario
     res = conn.execute(
-        sql_helper("select huc12_scenario from scenarios where id = :id"),
+        sql_helper(
+            "select huc12_scenario from scenario where scenario_id = :id"
+        ),
         {"id": query.scenario},
     )
     huc12_scenario = res.fetchone()[0]
@@ -369,26 +379,23 @@ def get_map_data(query: Schema, conn: Connection) -> gpd.GeoDataFrame:
     huclimiter = ""
     if query.huc is not None:
         if len(query.huc) == 8:
-            huclimiter = " and substr(i.huc_12, 1, 8) = :huc8 "
+            huclimiter = " and substr(i.huc12_code, 1, 8) = :huc8 "
             params["huc8"] = query.huc
         elif len(query.huc) == 12:
-            huclimiter = " and i.huc_12 = :huc12 "
+            huclimiter = " and i.huc12_code = :huc12 "
             params["huc12"] = query.huc
     if query.state:
         huclimiter += " and i.states ~* :state "
     if query.v in ["dt", "slp"]:
-        colname = (
-            "dominant_tillage" if query.v == "dt" else "average_slope_ratio"
-        )
         df = gpd.read_postgis(
             sql_helper(
                 """
         SELECT simple_geom as geom,
         {colname} as data
-        from huc12 i WHERE scenario = :huc12_scenario {huclimiter}
+        from huc12 i WHERE scenario_id = :huc12_scenario {huclimiter}
         """,
                 huclimiter=huclimiter,
-                colname=colname,
+                colname=COLMAPPER[query.v],
             ),
             conn,
             params=params,
@@ -399,18 +406,18 @@ def get_map_data(query: Schema, conn: Connection) -> gpd.GeoDataFrame:
             sql_helper(
                 """
         WITH data as (
-        SELECT huc_12, sum({v})  as d from results_by_huc12
-        WHERE scenario = :scenario and valid between :ts and :ts2
-        GROUP by huc_12)
+        SELECT huc12_id, sum({v})  as d from water_results_by_huc12
+        WHERE scenario_id = :scenario and valid between :ts and :ts2
+        GROUP by huc12_id)
 
         SELECT simple_geom as geom,
         coalesce(d.d, 0) * :dbcol as data
         from huc12 i LEFT JOIN data d
-        ON (i.huc_12 = d.huc_12) WHERE i.scenario = :huc12_scenario
+        ON (i.huc12_id = d.huc12_id) WHERE i.scenario_id = :huc12_scenario
         {huclimiter}
         """,
                 huclimiter=huclimiter,
-                v=query.v,
+                v=COLMAPPER[query.v],
             ),
             conn,
             params=params,
@@ -527,7 +534,7 @@ def application(environ: dict, start_response: callable):
     if query.overview:
         res = make_overviewmap(query).read()
     else:
-        with get_sqlalchemy_conn("idep") as conn:
+        with get_sqlalchemy_conn("dep") as conn:
             res = make_map(conn, query).read()
 
     # Ensure that all work is done before we start to respond.

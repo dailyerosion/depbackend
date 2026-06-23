@@ -78,7 +78,7 @@ def m2f(val):
     return ((val * units("m")).to(units("feet"))).m
 
 
-@with_sqlalchemy_conn("idep")
+@with_sqlalchemy_conn("dep")
 def generate_run_metadata(huc12: str, conn: Connection | None = None):
     """Information about DEP modelling of this huc12."""
     styles = getSampleStyleSheet()
@@ -86,9 +86,9 @@ def generate_run_metadata(huc12: str, conn: Connection | None = None):
     # Get the number of runs
     rs = conn.execute(
         sql_helper("""
-    select count(*), min(ST_Length(geom)), avg(ST_Length(geom)),
-    max(ST_Length(geom)) from flowpaths
-    where huc_12 = :huc12 and scenario = 0
+    select count(*), min(length_m), avg(length_m),
+    max(length_m) from flowpath p
+    where huc12_id = get_huc12_id(:huc12, 0) and scenario_id = 0
     """),
         {"huc12": huc12},
     )
@@ -120,9 +120,11 @@ def generate_run_metadata(huc12: str, conn: Connection | None = None):
     for year in range(2016, 2023):
         df = pd.read_sql(
             sql_helper("""
-        select substr(landuse, :offset, 1) as datum, count(*) from
-        flowpath_ofes o JOIN flowpaths f on (o.flowpath = f.fid)
-        WHERE f.huc_12 = :huc12 and f.scenario = 0 GROUP by datum
+        select substr(f.landuse, :offset, 1) as datum, count(*) from
+        flowpath_ofe o JOIN flowpath p on (o.flowpath_id = p.flowpath_id)
+        JOIN field f on (f.field_id = o.field_id)
+        WHERE f.huc12_id = get_huc12_id(:huc12, 0)
+        and f.scenario_id = 0 GROUP by datum
         """),
             conn,
             params={"offset": year - 2007 + 1, "huc12": huc12},
@@ -211,24 +213,26 @@ def generate_monthly_summary_table(huc12):
             "[days]",
         ]
     )
-    huc12col = "huc_12"
+    huc12col = "huc12_code"
     if len(huc12) == 8:
-        huc12col = "substr(huc_12, 1, 8)"
-    with get_sqlalchemy_conn("idep") as conn:
+        huc12col = "substr(huc12_code, 1, 8)"
+    with get_sqlalchemy_conn("dep") as conn:
         df = pd.read_sql(
             f"""
         WITH data as (
             SELECT extract(year from valid)::int as year,
-            extract(month from valid)::int as month, huc_12,
-            (sum(qc_precip) / 25.4)::numeric as sum_qc_precip,
-            (sum(avg_runoff) / 25.4)::numeric as sum_avg_runoff,
-            (sum(avg_loss) * %s)::numeric as sum_avg_loss,
-            (sum(avg_delivery) * %s)::numeric as sum_avg_delivery,
-            sum(case when qc_precip >= 50.8 then 1 else 0 end) as pdays,
-            sum(case when avg_loss > 0 then 1 else 0 end) as events
-            from results_by_huc12 WHERE scenario = 0 and {huc12col} = %s
+            extract(month from valid)::int as month, huc12_code,
+            (sum(qc_precip_mm) / 25.4)::numeric as sum_qc_precip,
+            (sum(avg_runoff_mm) / 25.4)::numeric as sum_avg_runoff,
+            (sum(avg_loss_kgm2) * %s)::numeric as sum_avg_loss,
+            (sum(avg_delivery_kgm2) * %s)::numeric as sum_avg_delivery,
+            sum(case when qc_precip_mm >= 50.8 then 1 else 0 end) as pdays,
+            sum(case when avg_loss_kgm2 > 0 then 1 else 0 end) as events
+            from water_results_by_huc12 w
+            JOIN huc12 h on (w.huc12_id = h.huc12_id)
+            WHERE w.scenario_id = 0 and {huc12col} = %s
             and valid >= '2016-01-01'
-            GROUP by year, month, huc_12)
+            GROUP by year, month, huc12_code)
         SELECT year, month,
         round(avg(sum_qc_precip), 2),
         round(avg(sum_avg_runoff), 2),
@@ -291,23 +295,25 @@ def generate_summary_table(huc12):
             "[days]",
         ]
     )
-    huc12col = "huc_12"
+    huc12col = "huc12_code"
     if len(huc12) == 8:
-        huc12col = "substr(huc_12, 1, 8)"
-    with get_sqlalchemy_conn("idep") as conn:
+        huc12col = "substr(huc12_code, 1, 8)"
+    with get_sqlalchemy_conn("dep") as conn:
         df = pd.read_sql(
             f"""
         WITH data as (
-            SELECT extract(year from valid)::int as year, huc_12,
-            (sum(qc_precip) / 25.4)::numeric as sum_qc_precip,
-            (sum(avg_runoff) / 25.4)::numeric as sum_avg_runoff,
-            (sum(avg_loss) * %s)::numeric as sum_avg_loss,
-            (sum(avg_delivery) * %s)::numeric as sum_avg_delivery,
-            sum(case when qc_precip >= 50.8 then 1 else 0 end) as pdays,
-            sum(case when avg_loss > 0 then 1 else 0 end) as events
-            from results_by_huc12 WHERE scenario = 0 and {huc12col} = %s
+            SELECT extract(year from valid)::int as year, huc12_code,
+            (sum(qc_precip_mm) / 25.4)::numeric as sum_qc_precip,
+            (sum(avg_runoff_mm) / 25.4)::numeric as sum_avg_runoff,
+            (sum(avg_loss_kgm2) * %s)::numeric as sum_avg_loss,
+            (sum(avg_delivery_kgm2) * %s)::numeric as sum_avg_delivery,
+            sum(case when qc_precip_mm >= 50.8 then 1 else 0 end) as pdays,
+            sum(case when avg_loss_kgm2 > 0 then 1 else 0 end) as events
+            from water_results_by_huc12 w
+            JOIN huc12 h on (w.huc12_id = h.huc12_id) WHERE
+            w.scenario_id = 0 and {huc12col} = %s
             and valid >= '2008-01-01'
-            GROUP by year, huc_12)
+            GROUP by year, huc12_code)
         SELECT year,
         round(avg(sum_qc_precip), 2),
         round(avg(sum_avg_runoff), 2),

@@ -26,12 +26,12 @@ class Schema(CGIModel):
 def search(q):
     """Search for q"""
     d = dict(results=[])
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         res = conn.execute(
             sql_helper(
-                """SELECT huc_12, name from huc12
-                WHERE (name ~* :name or strpos(huc_12, :name) = 1)
-                and scenario = 0 LIMIT 10"""
+                """SELECT huc12_code, name from huc12
+                WHERE (name ~* :name or strpos(huc12_code, :name) = 1)
+                and scenario_id = 0 LIMIT 10"""
             ),
             {"name": q},
         )
@@ -44,7 +44,6 @@ def search(q):
 @iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """DO Something"""
-    headers = [("Content-type", "application/json")]
-    start_response("200 OK", headers)
-
-    return json.dumps(search(environ["q"]))
+    payload = json.dumps(search(environ["q"]))
+    start_response("200 OK", [("Content-type", "application/json")])
+    return payload
