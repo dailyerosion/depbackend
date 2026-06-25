@@ -44,7 +44,7 @@ def do(ts, ts2):
             WHERE valid >= :sdate and valid <= :edate
             and w.scenario_id = 0 GROUP by w.huc12_id)
 
-        SELECT h.huc12_code as huc12,
+        SELECT h.huc12_code as huc_12,
         coalesce(round(d.avg_loss::numeric, 2), 0) as avg_loss,
         coalesce(round(d.qc_precip::numeric, 2), 0) as qc_precip,
         coalesce(round(d.avg_delivery::numeric, 2), 0) as avg_delivery,
