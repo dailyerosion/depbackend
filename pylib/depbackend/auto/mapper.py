@@ -42,6 +42,8 @@ from pyproj import Transformer
 from pyproj.crs.crs import CRS
 from sqlalchemy.engine import Connection
 
+from depbackend.fields import SCENARIO_FIELD
+
 V2NAME = {
     "avg_loss": "Detachment",
     "qc_precip": "Precipitation",
@@ -107,7 +109,7 @@ class Schema(CGIModel):
     day2: Annotated[
         int | None, Field(description="Day of end date.", ge=1, le=31)
     ] = None
-    scenario: Annotated[int, Field(description="Scenario ID", ge=0)] = 0
+    scenario: SCENARIO_FIELD = 0
     v: Annotated[str, Field(description="Variable to plot")] = "avg_loss"
     huc: Annotated[
         str | None,

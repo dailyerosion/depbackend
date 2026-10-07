@@ -11,6 +11,7 @@ Changelog
 """
 
 import json
+from typing import Annotated
 
 from pydantic import Field
 from pyiem.database import get_sqlalchemy_conn, sql_helper
@@ -20,7 +21,7 @@ from pyiem.webutil import CGIModel, iemapp
 class Schema(CGIModel):
     """See how we are called."""
 
-    q: str = Field(..., description="Search query")
+    q: Annotated[str, Field(description="Search query")]
 
 
 def search(q):

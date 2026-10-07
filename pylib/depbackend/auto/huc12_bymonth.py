@@ -13,6 +13,8 @@ from pyiem.exceptions import NoDataFound
 from pyiem.plot import figure
 from pyiem.webutil import CGIModel, iemapp
 
+from depbackend.fields import SCENARIO_FIELD
+
 TITLES = {
     "qc_precip": "Precipitation (inch)",
     "avg_runoff": "Water Runoff (inch)",
@@ -31,12 +33,7 @@ class Schema(CGIModel):
             max_length=12,
         ),
     ] = "070600040601"
-    scenario: Annotated[
-        int,
-        Field(
-            description="Scenario ID to generate metadata for",
-        ),
-    ] = 0
+    scenario: SCENARIO_FIELD = 0
 
 
 def make_plot(huc12, scenario):

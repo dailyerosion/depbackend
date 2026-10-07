@@ -27,6 +27,8 @@ from pyiem.database import sql_helper, with_sqlalchemy_conn
 from pyiem.webutil import CGIModel, iemapp
 from sqlalchemy.engine import Connection
 
+from depbackend.fields import SCENARIO_FIELD
+
 
 class Schema(CGIModel):
     """See how we are called."""
@@ -47,12 +49,7 @@ class Schema(CGIModel):
     date2: Annotated[
         dateobj | None, Field(description="Inclusive End Date.")
     ] = None
-    scenario: Annotated[
-        int,
-        Field(
-            description="Scenario ID",
-        ),
-    ] = 0
+    scenario: SCENARIO_FIELD = 0
     metric: Annotated[
         bool,
         Field(

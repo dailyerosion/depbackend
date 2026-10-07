@@ -1,24 +1,19 @@
 """Simple JSON of DEP metadata versioning."""
 
 from io import StringIO
-from typing import Annotated
 
 import pandas as pd
-from pydantic import Field
 from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.exceptions import NoDataFound
 from pyiem.webutil import CGIModel, iemapp
+
+from depbackend.fields import SCENARIO_FIELD
 
 
 class Schema(CGIModel):
     """See how we are called."""
 
-    scenario: Annotated[
-        int,
-        Field(
-            description="Scenario ID to generate metadata for",
-        ),
-    ] = 0
+    scenario: SCENARIO_FIELD = 0
 
 
 def gen(scenario):

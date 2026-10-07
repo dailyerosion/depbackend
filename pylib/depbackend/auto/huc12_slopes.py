@@ -12,6 +12,8 @@ from pydantic import Field
 from pyiem.exceptions import NoDataFound
 from pyiem.webutil import CGIModel, iemapp
 
+from depbackend.fields import SCENARIO_FIELD
+
 
 class Schema(CGIModel):
     """See how we are called."""
@@ -23,12 +25,7 @@ class Schema(CGIModel):
             max_length=12,
         ),
     ] = "070600040601"
-    scenario: Annotated[
-        int,
-        Field(
-            description="Scenario ID to generate metadata for",
-        ),
-    ] = 0
+    scenario: SCENARIO_FIELD = 0
 
 
 def make_plot(huc12: str, scenario: int):
@@ -75,5 +72,6 @@ def make_plot(huc12: str, scenario: int):
 @iemapp(help=__doc__, schema=Schema)
 def application(environ, start_response):
     """Do something fun"""
+    payload = make_plot(environ["huc12"], environ["scenario"]).read()
     start_response("200 OK", [("Content-type", "image/png")])
-    return [make_plot(environ["huc12"], environ["scenario"]).read()]
+    return [payload]

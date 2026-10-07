@@ -1,10 +1,10 @@
 """.. title:: DEP HUC8 Summary for OFETool Usage
 
-This service provides a summary of DEP outputs by OFE for a HUC12.
-
+This service provides a summary of DEP outputs by OFE for a HUC8.
 """
 
 import os
+from typing import Annotated
 
 from pydantic import Field
 from pyiem.util import logger
@@ -16,7 +16,9 @@ LOG = logger()
 class Schema(CGIModel):
     """See how we are called."""
 
-    huc8: str = Field(..., description="HUC8 identifier", pattern=r"^\d{8}$")
+    huc8: Annotated[
+        str, Field(description="HUC8 identifier", pattern=r"^\d{8}$")
+    ]
 
 
 @iemapp(help=__doc__, schema=Schema)

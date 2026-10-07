@@ -36,7 +36,10 @@ from pyiem.exceptions import NoDataFound
 from pyiem.iemre import get_domain
 from pyiem.util import logger
 from pyiem.webutil import CGIModel, ListOrCSVType, iemapp
+from pyiem.web.fields import LATITUDE_FIELD, LONGITUDE_FIELD
 from sqlalchemy.engine import Connection
+
+from depbackend.fields import SCENARIO_FIELD
 
 LOG = logger()
 
@@ -44,12 +47,8 @@ LOG = logger()
 class Schema(CGIModel):
     """See how we are called."""
 
-    lat: Annotated[
-        float, Field(description="Latitude of point", ge=-90, le=90)
-    ]
-    lon: Annotated[
-        float, Field(description="Longitude of point", ge=-180, le=180)
-    ]
+    lat: LATITUDE_FIELD
+    lon: LONGITUDE_FIELD
     format: Annotated[
         str,
         Field(
@@ -64,14 +63,7 @@ class Schema(CGIModel):
             description="Comma delimited list of intensities to compute",
         ),
     ]
-    scenario: Annotated[
-        int,
-        Field(
-            description="Scenario ID",
-            ge=-9999,
-            le=9999,
-        ),
-    ] = 0
+    scenario: SCENARIO_FIELD = 0
 
 
 def log_request(
