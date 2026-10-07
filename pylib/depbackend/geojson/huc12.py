@@ -25,6 +25,7 @@ from pydantic import Field
 from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.util import logger, utc
 from pyiem.webutil import CGIModel, iemapp
+from pyiem.web.fields import CALLBACK_FIELD
 
 LOG = logger()
 
@@ -32,9 +33,7 @@ LOG = logger()
 class Schema(CGIModel):
     """See how we are called."""
 
-    callback: Annotated[
-        str | None, Field(description="JSONP callback function")
-    ] = None
+    callback: CALLBACK_FIELD = None
     date: Annotated[dateobj, Field(description="Date to query")]
     date2: Annotated[
         dateobj | None, Field(description="Optional end date to query")

@@ -2,11 +2,12 @@
 
 import json
 
-from pydantic import Field
 from pyiem.database import sql_helper, with_sqlalchemy_conn
 from pyiem.util import utc
 from pyiem.webutil import CGIModel, iemapp
 from sqlalchemy.engine import Connection
+
+from depbackend.fields import SCENARIO_FIELD
 
 ISO = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -14,7 +15,7 @@ ISO = "%Y-%m-%dT%H:%M:%SZ"
 class Schema(CGIModel):
     """See how we are called."""
 
-    scenario: int = Field(0, description="Scenario to query for")
+    scenario: SCENARIO_FIELD = 0
 
 
 @with_sqlalchemy_conn("dep")

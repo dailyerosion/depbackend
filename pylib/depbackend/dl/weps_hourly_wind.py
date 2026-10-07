@@ -22,13 +22,12 @@ https://mesonet-dep.agron.iastate.edu/dl/weps_hourly_wind.py?lat=42.0&lon=-93.0
 """
 
 from pathlib import Path
-from typing import Annotated
 
-from pydantic import Field
 from pyiem.exceptions import NoDataFound
 from pyiem.iemre import get_gid, get_domain
 from pyiem.util import logger
 from pyiem.webutil import CGIModel, iemapp
+from pyiem.web.fields import LATITUDE_FIELD, LONGITUDE_FIELD
 
 LOG = logger()
 
@@ -36,14 +35,8 @@ LOG = logger()
 class Schema(CGIModel):
     """See how we are called."""
 
-    lat: Annotated[
-        float,
-        Field(description="Latitude of point, degrees North", ge=-90, le=90),
-    ]
-    lon: Annotated[
-        float,
-        Field(description="Longitude of point, degrees East", ge=-180, le=180),
-    ]
+    lat: LATITUDE_FIELD
+    lon: LONGITUDE_FIELD
 
 
 @iemapp(help=__doc__, schema=Schema)
