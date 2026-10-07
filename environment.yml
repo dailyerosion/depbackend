@@ -2,7 +2,6 @@ dependencies:
   - cartopy_offlinedata
   - dailyerosion
   - gdal
-  - httpx
   - pandas
   # database
   - postgresql
@@ -10,7 +9,7 @@ dependencies:
   - pydantic
   - pygrib
   # DISCIPLINE DARYL
-  - pyiem >=1.25.0
+  - pyiem >=1.28.1
   - pytest
   - pytest-cov
   - rasterio
