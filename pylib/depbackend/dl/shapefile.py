@@ -85,7 +85,7 @@ def workflow(start_response: Callable, dt, dt2, states, conv):
                 from water_results_by_huc12 WHERE {dextra} and scenario_id = 0
                 GROUP by huc12_id)
 
-            SELECT d.simple_geom as geo, d.huc12_id, d.name,
+            SELECT d.simple_geom as geo, d.huc12_code as huc12_id, d.name,
             d.dominant_tillage as tillcode,
             d.avg_slope_ratio as avg_slp1,
             coalesce(o.qc_precip, 0) as prec_mm,
